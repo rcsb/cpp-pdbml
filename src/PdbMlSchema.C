@@ -18,7 +18,7 @@
 #include "CifString.h"
 #include "GenCont.h"
 #include "CifFile.h"
-#include "CifParserBase.h"
+#include "CifFileUtil.h"
 #include "ParentChild.h"
 #include "XsdWriter.h"
 #include "PdbMlWriter.h"
@@ -414,19 +414,12 @@ void PdbMlSchema::_WriteCategoryDocumentation(const string& catName)
 
         ostringstream exampleXMLStream;
 
-        CifFile* fobjIn = new CifFile();
-        
-        CifParser* cifParserR = new CifParser(fobjIn);
+        CifFile* fobjIn = ParseCifString(exampleCIF);
 
-        string diags;
-        cifParserR->ParseString(exampleCIF, diags);
-
-        delete (cifParserR);
-
-        if (!diags.empty())
+        if (!(fobjIn->_parsingDiags).empty())
         {
             cerr << "Diags for category " << catName << "  = " <<
-              diags << endl;
+              fobjIn->_parsingDiags << endl;
         }
 
         PdbMlWriter pdbMlWriter(exampleXMLStream, _ns, _dataInfo);
