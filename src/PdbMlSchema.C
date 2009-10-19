@@ -416,10 +416,12 @@ void PdbMlSchema::_WriteCategoryDocumentation(const string& catName)
 
         CifFile* fobjIn = ParseCifString(exampleCIF);
 
-        if (!(fobjIn->_parsingDiags).empty())
+        const string& parsingDiags = fobjIn->GetParsingDiags();
+
+        if (!parsingDiags.empty())
         {
             cerr << "Diags for category " << catName << "  = " <<
-              fobjIn->_parsingDiags << endl;
+              parsingDiags << endl;
         }
 
         PdbMlWriter pdbMlWriter(exampleXMLStream, _ns, _dataInfo);
