@@ -213,13 +213,12 @@ void PdbMlSchema::_WriteCategoriesTypes(const vector<string>& categories,
 
         _xsdWriter.IncrementIndent();
 
-        _xsdWriter.Indent();
-        _xsdWriter.WriteAllOpeningTag();
-
         vector<string> keys = _dataInfo.GetCatKeys(categories[i]);
         sort (keys.begin(), keys.end());
 
-        _xsdWriter.IncrementIndent();
+#ifndef VLAD_NEW_CODE
+        // Figure out the non-key category items
+        vector<string> nonKeyItems;
         for (unsigned int j=0; j < items.size(); j++)
         {
             string categoryName;
@@ -234,14 +233,27 @@ void PdbMlSchema::_WriteCategoriesTypes(const vector<string>& categories,
             if (GenCont::IsInVector(items[j], keys))
                 continue;
 
-            // Non-key attribures as elements 
-            _WriteNonKeyItem(items[j]);
+            // Non-key item of this cateogory detected
+            nonKeyItems.push_back(items[j]);
         }
+#endif
 
-        _xsdWriter.DecrementIndent();
+        if (!nonKeyItems.empty())
+        {
+            _xsdWriter.Indent();
+            _xsdWriter.WriteAllOpeningTag();
 
-        _xsdWriter.Indent();
-        _xsdWriter.WriteAllClosingTag();
+            _xsdWriter.IncrementIndent();
+            for (unsigned int j=0; j < nonKeyItems.size(); j++)
+            {
+                _WriteNonKeyItem(nonKeyItems[j]);
+            }
+
+            _xsdWriter.DecrementIndent();
+
+            _xsdWriter.Indent();
+            _xsdWriter.WriteAllClosingTag();
+        }
 
         for (unsigned int j=0; j < keys.size(); j++)
         {
@@ -312,7 +324,9 @@ void PdbMlSchema::_WriteDatablockType(const vector<string>& categories)
         _xsdWriter.WriteMaxOccursAttribute("1");
         _xsdWriter.WriteClosingBracket();
 
+#ifdef VLAD_DEL
         _WriteCategoryKeys(categories[i]);
+#endif
 
         _xsdWriter.Indent();
         _xsdWriter.WriteElementClosingTag();
@@ -355,6 +369,7 @@ void PdbMlSchema::_WriteDatablockElement(const vector<string>& categories)
 
     for (unsigned int i=0; i < categories.size(); i++)
     {
+        _WriteCategoryKeys(categories[i]);
         _WriteCategoryKeysAndKeyrefs(categories[i]); 
     }
 
@@ -515,11 +530,13 @@ void PdbMlSchema::_WriteCategoryKeys(const string& catName)
         return;
     }
 
+#ifdef VLAD_DEL
     _xsdWriter.IncrementIndent();
+#endif
 
     _xsdWriter.Indent();
     _xsdWriter.WriteUniqueOpeningTag();
-    _xsdWriter.WriteNameAttribute(catName + "Unique");
+    _xsdWriter.WriteNameAttribute(catName + "Unique_0");
     _xsdWriter.WriteClosingBracket();
 
     _xsdWriter.IncrementIndent();
@@ -527,7 +544,11 @@ void PdbMlSchema::_WriteCategoryKeys(const string& catName)
     _xsdWriter.Indent();
     _xsdWriter.WriteSelectorOpeningTag();
 
-    _xsdWriter.WriteXpathAttribute(catName);
+    string catElemName;
+    PdbMlSchema::MakeCategoryElementName(catElemName, catName);
+
+    _xsdWriter.WriteXpathAttribute(_nsPrefix + catElemName + string("/") +
+      _nsPrefix + catName);
     _xsdWriter.WriteClosingTag();
 
     for (unsigned int i=0; i < keys.size(); i++)
@@ -555,7 +576,92 @@ void PdbMlSchema::_WriteCategoryKeys(const string& catName)
     _xsdWriter.Indent();
     _xsdWriter.WriteUniqueClosingTag();
 
+#ifdef VLAD_DEL
     _xsdWriter.DecrementIndent();
+#endif
+
+
+    //
+    const vector<vector<string> >& parComboKeys =
+     _parentChild.GetComboKeys(catName);
+
+    // keyId of 0 is reserved for all category keys
+    unsigned keyId = 1;
+
+    for (unsigned int keyI = 0; keyI < parComboKeys.size(); ++keyI)
+    {
+#ifndef VLAD_NEW
+        // Check if all keys are category keys
+        bool allKeysAreCatKeys = true;
+        for (unsigned int i=0; i < parComboKeys[keyI].size(); i++)
+        {
+            string attribName;
+            CifString::GetItemFromCifItem(attribName, parComboKeys[keyI][i]);
+            if (!_dataInfo.IsKeyItem(catName, attribName))
+            {
+                allKeysAreCatKeys = false;
+                break;
+            }
+        }
+    
+        if (allKeysAreCatKeys && (keys.size() == parComboKeys[keyI].size()))
+        {
+            // Unique for all category keys
+            continue;
+        }
+#endif
+
+#ifdef VLAD_DELETED
+        _xsdWriter.IncrementIndent();
+#endif
+        _xsdWriter.Indent();
+        _xsdWriter.WriteUniqueOpeningTag();
+        _xsdWriter.WriteNameAttribute(catName + "Unique" + + "_" +
+          String::IntToString(keyId));
+        keyId++;
+        _xsdWriter.WriteClosingBracket();
+
+        _xsdWriter.IncrementIndent();
+
+        _xsdWriter.Indent();
+        _xsdWriter.WriteSelectorOpeningTag();
+
+        string catElemName;
+        PdbMlSchema::MakeCategoryElementName(catElemName, catName);
+
+        _xsdWriter.WriteXpathAttribute(_nsPrefix + catElemName + string("/") +
+          _nsPrefix + catName);
+        _xsdWriter.WriteClosingTag();
+
+
+        for (unsigned int i=0; i < parComboKeys[keyI].size(); i++)
+        {
+          string attribName;
+          CifString::GetItemFromCifItem(attribName, parComboKeys[keyI][i]);
+
+          _xsdWriter.Indent();
+          _xsdWriter.WriteFieldOpeningTag();
+          if (_dataInfo.IsKeyItem(catName, attribName))
+          {
+              _xsdWriter.WriteXpathAttribute(attribName, true);
+          }
+          else
+          {
+              _xsdWriter.WriteXpathAttribute(_nsPrefix + attribName);
+          }
+
+          _xsdWriter.WriteClosingTag();
+        }
+
+        _xsdWriter.DecrementIndent();
+
+        _xsdWriter.Indent();
+        _xsdWriter.WriteUniqueClosingTag();
+
+#ifdef VLAD_DELETED
+        _xsdWriter.DecrementIndent();
+#endif
+    }
 }
 
 
@@ -573,12 +679,18 @@ void PdbMlSchema::_WriteCategoryKeysAndKeyrefs(const string& catName)
     const vector<vector<string> >& parComboKeys =
      _parentChild.GetComboKeys(catName);
 
+    // keyId of 0 is reserved for all category keys
+    unsigned keyId = 1;
+
     for (unsigned int keyI = 0; keyI < parComboKeys.size(); ++keyI)
     {
         bool parentKeyWritten = false;
+        bool allKeysAreCatKeys = true;
 
         vector<vector<vector<string> > >& childrenKeys =
           _parentChild.GetChildrenKeys(parComboKeys[keyI]);
+
+        unsigned int currKeyId = keyId;
 
         for (unsigned int childI = 0; childI < childrenKeys.size(); ++childI)
         {
@@ -588,6 +700,8 @@ void PdbMlSchema::_WriteCategoryKeysAndKeyrefs(const string& catName)
                 CifString::GetCategoryFromCifItem(childCatName,
                   childrenKeys[childI][0][0]); 
             }
+
+            //unsigned int currKeyId = keyId;
 
             for (unsigned int childKeyI = 0; childKeyI <
               childrenKeys[childI].size(); ++childKeyI)
@@ -603,28 +717,64 @@ void PdbMlSchema::_WriteCategoryKeysAndKeyrefs(const string& catName)
                     chKeys.push_back(chAttribName);
                 }
 
+                // unsigned int currKeyId = keyId;
+
                 if (!parentKeyWritten)
                 {
-                    _WriteComboKey(catName, parComboKeys[keyI],
-                      String::IntToString(keyI + 1));
 
+#ifndef VLAD_NEW
+                    // Check if all keys are category keys
+                    for (unsigned int i=0; i < parComboKeys[keyI].size(); i++)
+                    {
+                        string attribName;
+                        CifString::GetItemFromCifItem(attribName, parComboKeys[keyI][i]);
+                        if (!_dataInfo.IsKeyItem(catName, attribName))
+                        {
+                            allKeysAreCatKeys = false;
+                            break;
+                        }
+                    }
+
+                    if (!allKeysAreCatKeys ||
+                      !(catKeys.size() == parComboKeys[keyI].size()))
+                    {
+                        _WriteComboKey(catName, parComboKeys[keyI],
+                          String::IntToString(keyId));
+                        keyId++;
+                    }
                     parentKeyWritten = true;
                 }
+#endif
 
-                string keyRefName = catName + "Keyref" + "_" +
-                  String::IntToString(keyI + 1) + "_" +
-                  String::IntToString(childI) + "_" +
-                  String::IntToString(childKeyI);
-                string keyName = _nsPrefix + catName + "Key" + "_" +
-                  String::IntToString(keyI + 1);
+                string keyRefName;
+                string keyName;
+                if (allKeysAreCatKeys && (catKeys.size() == parComboKeys[keyI].size()))
+                {
+                    keyRefName = catName + "Keyref" + "_" +
+                      String::IntToString(0) + "_" +
+                      String::IntToString(childI) + "_" +
+                      String::IntToString(childKeyI);
+                    keyName = _nsPrefix + catName + "Key" + "_" +
+                      String::IntToString(0);
+                }
+                else
+                {
+                    keyRefName = catName + "Keyref" + "_" +
+                      String::IntToString(currKeyId) + "_" +
+                      String::IntToString(childI) + "_" +
+                      String::IntToString(childKeyI);
+                    keyName = _nsPrefix + catName + "Key" + "_" +
+                      String::IntToString(currKeyId);
+                }
 
                 string childCatElemName;
                 PdbMlSchema::MakeCategoryElementName(childCatElemName,
                   childCatName);
 
-                string xPath = childCatElemName + string("/") + childCatName;
+                string xPath = _nsPrefix + childCatElemName + string("/") +
+                  _nsPrefix + childCatName;
 
-                sort(chKeys.begin(), chKeys.end());
+                // sort(chKeys.begin(), chKeys.end());
 
                 _WriteKeyRef(keyRefName, keyName, xPath, chKeys, childCatName);
             } // for (all child's keys)
@@ -1180,7 +1330,7 @@ void PdbMlSchema::_WriteComboKey(const string& catName,
     }
 
     vector<string> sortedKeyItems = keyItems;
-    sort(sortedKeyItems.begin(), sortedKeyItems.end());
+    //sort(sortedKeyItems.begin(), sortedKeyItems.end());
 
     _xsdWriter.Indent();
     _xsdWriter.WriteKeyOpeningTag();
@@ -1194,7 +1344,8 @@ void PdbMlSchema::_WriteComboKey(const string& catName,
 
     string catElemName;
     PdbMlSchema::MakeCategoryElementName(catElemName, catName);
-    _xsdWriter.WriteXpathAttribute(catElemName + string("/") + catName);
+    _xsdWriter.WriteXpathAttribute(_nsPrefix + catElemName + string("/") +
+      _nsPrefix + catName);
     _xsdWriter.WriteClosingTag();
 
     for (unsigned int i = 0; i < sortedKeyItems.size(); ++i)
@@ -1211,7 +1362,15 @@ void PdbMlSchema::_WriteComboKey(const string& catName,
         _xsdWriter.Indent();
         _xsdWriter.WriteFieldOpeningTag();
 
-        _xsdWriter.WriteXpathAttribute(attribName, true);
+        if (_dataInfo.IsKeyItem(catName, attribName))
+        {
+            _xsdWriter.WriteXpathAttribute(attribName, true);
+        }
+        else
+        {
+            _xsdWriter.WriteXpathAttribute(_nsPrefix + attribName);
+        }
+
         _xsdWriter.WriteClosingTag();
     }
 
@@ -1257,7 +1416,7 @@ void PdbMlSchema::_WriteKeyRef(const string& keyRefName, const string& keyName,
         }
         else
         {
-            _xsdWriter.WriteXpathAttribute(childKeys[keyI]);
+            _xsdWriter.WriteXpathAttribute(_nsPrefix + childKeys[keyI]);
         }
 
         _xsdWriter.WriteClosingTag();
