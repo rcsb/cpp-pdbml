@@ -643,14 +643,7 @@ void PdbMlSchema::_WriteCategoryKeys(const string& catName)
 
 void PdbMlSchema::_WriteCategoryKeysAndKeyrefs(const string& catName) 
 {
-    // First, write one combo key for all category keys irrespectively
-    // whether they are linked to any children or not. This will be
-    // identified as key 0.
-
     const vector<string>& catKeys = _dataInfo.GetCatKeys(catName);
-
-    // keyId of 0 is reserved for all category keys
-    _WriteComboKey(catName, catKeys, String::IntToString(0));
 
     // Get all combo keys participating in parent-child relationships.
     const vector<vector<string> >& parComboKeys =
@@ -713,6 +706,13 @@ void PdbMlSchema::_WriteCategoryKeysAndKeyrefs(const string& catName)
                         _WriteComboKey(catName, parComboKeys[keyI],
                           String::IntToString(keyId));
                         keyId++;
+                    }
+                    else
+                    {
+                        // Parent key items are identical to category keys.
+                        // This will be identified as key 0.
+
+                       _WriteComboKey(catName, catKeys, String::IntToString(0));
                     }
 
                     parentKeyWritten = true;
