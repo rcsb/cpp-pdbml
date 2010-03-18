@@ -9,6 +9,7 @@
 
 #include <string>
 #include <vector>
+#include <map>
 #include <sstream>
 #include <iostream>
 #include <algorithm>
@@ -27,6 +28,7 @@
 
 using std::string;
 using std::vector;
+using std::multimap;
 using std::ostringstream;
 using std::cerr;
 using std::endl;
@@ -574,12 +576,15 @@ void PdbMlSchema::_WriteCategoryKeys(const string& catName)
 
     for (unsigned int keyI = 0; keyI < parComboKeys.size(); ++keyI)
     {
+        vector<string> sortedParComboKey = parComboKeys[keyI];
+        sort(sortedParComboKey.begin(), sortedParComboKey.end());
+
         // Check if all keys are category keys
         bool allKeysAreCatKeys = true;
-        for (unsigned int i=0; i < parComboKeys[keyI].size(); i++)
+        for (unsigned int i=0; i < sortedParComboKey.size(); i++)
         {
             string attribName;
-            CifString::GetItemFromCifItem(attribName, parComboKeys[keyI][i]);
+            CifString::GetItemFromCifItem(attribName, sortedParComboKey[i]);
             if (!_dataInfo.IsKeyItem(catName, attribName))
             {
                 allKeysAreCatKeys = false;
@@ -587,7 +592,7 @@ void PdbMlSchema::_WriteCategoryKeys(const string& catName)
             }
         }
     
-        if (allKeysAreCatKeys && (keys.size() == parComboKeys[keyI].size()))
+        if (allKeysAreCatKeys && (keys.size() == sortedParComboKey.size()))
         {
             // Unique for all category keys
             continue;
@@ -614,10 +619,10 @@ void PdbMlSchema::_WriteCategoryKeys(const string& catName)
           _nsPrefix + catName);
         _xsdWriter.WriteClosingTag();
 
-        for (unsigned int i=0; i < parComboKeys[keyI].size(); i++)
+        for (unsigned int i=0; i < sortedParComboKey.size(); i++)
         {
           string attribName;
-          CifString::GetItemFromCifItem(attribName, parComboKeys[keyI][i]);
+          CifString::GetItemFromCifItem(attribName, sortedParComboKey[i]);
 
           _xsdWriter.Indent();
           _xsdWriter.WriteFieldOpeningTag();
@@ -674,7 +679,7 @@ void PdbMlSchema::_WriteCategoryKeysAndKeyrefs(const string& catName)
             for (unsigned int childKeyI = 0; childKeyI <
               childrenKeys[childI].size(); ++childKeyI)
             {
-                vector<string> chKeys;
+                multimap<string, string, StringLess> keyMap;
 
                 for (unsigned int keyItemI = 0; keyItemI <
                   childrenKeys[childI][childKeyI].size(); ++keyItemI)
@@ -682,7 +687,10 @@ void PdbMlSchema::_WriteCategoryKeysAndKeyrefs(const string& catName)
                     string chAttribName;
                     CifString::GetItemFromCifItem(chAttribName,
                       childrenKeys[childI][childKeyI][keyItemI]);
-                    chKeys.push_back(chAttribName);
+                    multimap<string, string, StringLess>::value_type
+                      valuePairIndex(parComboKeys[keyI][keyItemI],
+                      chAttribName);
+                    keyMap.insert(valuePairIndex);
                 }
 
                 if (!parentKeyWritten)
@@ -703,7 +711,11 @@ void PdbMlSchema::_WriteCategoryKeysAndKeyrefs(const string& catName)
                     if (!allKeysAreCatKeys ||
                       !(catKeys.size() == parComboKeys[keyI].size()))
                     {
-                        _WriteComboKey(catName, parComboKeys[keyI],
+                        vector<string> sortedParComboKey = parComboKeys[keyI];
+                        sort(sortedParComboKey.begin(),
+                          sortedParComboKey.end());
+           
+                        _WriteComboKey(catName, sortedParComboKey,
                           String::IntToString(keyId));
                         keyId++;
                     }
@@ -712,7 +724,11 @@ void PdbMlSchema::_WriteCategoryKeysAndKeyrefs(const string& catName)
                         // Parent key items are identical to category keys.
                         // This will be identified as key 0.
 
-                       _WriteComboKey(catName, catKeys, String::IntToString(0));
+                        vector<string> sortedCatKeys = catKeys;
+                        sort(sortedCatKeys.begin(), sortedCatKeys.end());
+
+                        _WriteComboKey(catName, sortedCatKeys,
+                          String::IntToString(0));
                     }
 
                     parentKeyWritten = true;
@@ -724,7 +740,6 @@ void PdbMlSchema::_WriteCategoryKeysAndKeyrefs(const string& catName)
                   (catKeys.size() == parComboKeys[keyI].size()))
                 {
                     usedKeyId = 0;
-
                 }
 
                 string keyRefName = catName + "Keyref" + "_" +
@@ -740,6 +755,13 @@ void PdbMlSchema::_WriteCategoryKeysAndKeyrefs(const string& catName)
 
                 string xPath = _nsPrefix + childCatElemName + string("/") +
                   _nsPrefix + childCatName;
+
+                vector<string> chKeys;
+                for (multimap<string, string, StringLess>::iterator iter =
+                  keyMap.begin(); iter != keyMap.end(); ++iter)
+                {
+                    chKeys.push_back((*iter).second);
+                }
 
                 _WriteKeyRef(keyRefName, keyName, xPath, chKeys, childCatName);
             } // for (all child's keys)
