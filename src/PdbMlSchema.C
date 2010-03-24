@@ -792,7 +792,14 @@ void PdbMlSchema::_WriteItemAttributes(const string& itemName,
 
         _xsdWriter.WriteMinOccursAttribute(minOccurs);
         _xsdWriter.WriteMaxOccursAttribute("1");
+#ifdef VLAD_NEW
+        if (!_parentChild.IsInParentComboKeys(itemName))
+        {
+            _xsdWriter.WriteNillableAttribute("true");
+        }
+#else
         _xsdWriter.WriteNillableAttribute("true");
+#endif
     }
 
     bool simpleTyping = _dataInfo.IsSimpleDataType(itemName);
