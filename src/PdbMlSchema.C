@@ -9,6 +9,7 @@
 
 #include <string>
 #include <vector>
+#include <set>
 #include <map>
 #include <sstream>
 #include <iostream>
@@ -28,6 +29,7 @@
 
 using std::string;
 using std::vector;
+using std::set;
 using std::multimap;
 using std::ostringstream;
 using std::cerr;
@@ -648,22 +650,97 @@ void PdbMlSchema::_WriteCategoryKeys(const string& catName)
 
 void PdbMlSchema::_WriteCategoryKeysAndKeyrefs(const string& catName) 
 {
-    const vector<string>& catKeys = _dataInfo.GetCatKeys(catName);
-
     // Get all combo keys participating in parent-child relationships.
-    const vector<vector<string> >& parComboKeys =
+    const vector<vector<string> >& origParComboKeys =
      _parentChild.GetComboKeys(catName);
 
+#ifndef VLAD_NEW_1
+    vector<vector<string> > parComboKeys;
+    vector<vector<vector<vector<string> > > > allChildrenKeys;
+
+    for (unsigned int keyI = 0; keyI < origParComboKeys.size(); ++keyI)
+    {
+        const vector<string>& currOrigParComboKey = origParComboKeys[keyI];
+
+        set<unsigned int> nonMandInd;
+
+        _FindNonMandItemsIndices(nonMandInd, currOrigParComboKey);
+
+        vector<vector<vector<string> > >& origChildrenKeys =
+          _parentChild.GetChildrenKeys(currOrigParComboKey);
+
+        for (unsigned int childI = 0; childI < origChildrenKeys.size();
+          ++childI)
+        {
+            for (unsigned int childKeyI = 0; childKeyI <
+              origChildrenKeys[childI].size(); ++childKeyI)
+            {
+                const vector<string>& currChKey =
+                  origChildrenKeys[childI][childKeyI];
+
+                _FindNonMandItemsIndices(nonMandInd, currChKey);
+            }
+        }
+
+        if (nonMandInd.size() == currOrigParComboKey.size())
+        {
+            // All keys are non-mandatory.
+            continue;
+        }
+
+        vector<string> newParComboKey = currOrigParComboKey;
+        _RemoveNonMandItems(newParComboKey, nonMandInd);
+ 
+        parComboKeys.push_back(newParComboKey);
+ 
+        vector<vector<vector<string> > > childrenKeys;
+
+        for (unsigned int childI = 0; childI < origChildrenKeys.size();
+          ++childI)
+        {
+            // Add empty vector
+            vector<vector<string> > newChKeys;
+
+            for (unsigned int childKeyI = 0; childKeyI <
+              origChildrenKeys[childI].size(); ++childKeyI)
+            {
+                const vector<string>& currChKey =
+                  origChildrenKeys[childI][childKeyI];
+
+                vector<string> newChKey = currChKey;
+                _RemoveNonMandItems(newChKey, nonMandInd);
+ 
+                newChKeys.push_back(newChKey);
+            }
+
+            childrenKeys.push_back(newChKeys);
+        } // for (all child categories)
+
+        allChildrenKeys.push_back(childrenKeys);
+    } // for (all original parent combo keys)
+#endif
+
+    const vector<string>& catKeys = _dataInfo.GetCatKeys(catName);
+
     // Start from 1, as keyId of 0 is reserved for all category keys
-    unsigned keyId = 1;
+    unsigned int keyId = 1;
+
+#ifndef VLAD_NEW_1
+    unsigned int altKeyId = 0; 
+#endif
 
     for (unsigned int keyI = 0; keyI < parComboKeys.size(); ++keyI)
     {
         bool parentKeyWritten = false;
         bool allKeysAreCatKeys = true;
 
+#ifdef VLAD_NEW_1
         vector<vector<vector<string> > >& childrenKeys =
           _parentChild.GetChildrenKeys(parComboKeys[keyI]);
+#else
+        vector<vector<vector<string> > >& childrenKeys =
+          allChildrenKeys[keyI];
+#endif
 
         unsigned int currKeyId = keyId;
 
@@ -724,26 +801,34 @@ void PdbMlSchema::_WriteCategoryKeysAndKeyrefs(const string& catName)
                         // Parent key items are identical to category keys.
                         // This will be identified as key 0.
 
-                        vector<string> sortedCatKeys = catKeys;
-                        sort(sortedCatKeys.begin(), sortedCatKeys.end());
+                        if (altKeyId == 0)
+                        {
+                            vector<string> sortedCatKeys = catKeys;
+                            sort(sortedCatKeys.begin(), sortedCatKeys.end());
 
-                        _WriteComboKey(catName, sortedCatKeys,
-                          String::IntToString(0));
+                            _WriteComboKey(catName, sortedCatKeys,
+                              String::IntToString(0));
+                        }
+
+                        altKeyId++;
                     }
 
                     parentKeyWritten = true;
                 }
 
                 unsigned int usedKeyId = currKeyId;
-
+                string keyRefPrefix = String::IntToString(usedKeyId);
+ 
                 if (allKeysAreCatKeys &&
                   (catKeys.size() == parComboKeys[keyI].size()))
                 {
                     usedKeyId = 0;
+                    keyRefPrefix = String::IntToString(usedKeyId) + "_" +
+                      String::IntToString(altKeyId);
                 }
 
                 string keyRefName = catName + "Keyref" + "_" +
-                  String::IntToString(usedKeyId) + "_" +
+                  keyRefPrefix + "_" +
                   String::IntToString(childI) + "_" +
                   String::IntToString(childKeyI);
                 string keyName = _nsPrefix + catName + "Key" + "_" +
@@ -792,7 +877,7 @@ void PdbMlSchema::_WriteItemAttributes(const string& itemName,
 
         _xsdWriter.WriteMinOccursAttribute(minOccurs);
         _xsdWriter.WriteMaxOccursAttribute("1");
-#ifdef VLAD_NEW
+#ifndef VLAD_NEW
         if (!_parentChild.IsInParentComboKeys(itemName))
         {
             _xsdWriter.WriteNillableAttribute("true");
@@ -1418,3 +1503,28 @@ void PdbMlSchema::_WriteKeyRef(const string& keyRefName, const string& keyName,
     _xsdWriter.Indent();
     _xsdWriter.WriteKeyrefClosingTag();
 }
+
+
+void PdbMlSchema::_FindNonMandItemsIndices(set<unsigned int>& nonMandIndices,
+  const vector<string>& itemsNames)
+{
+    for (unsigned int indI = 0; indI < itemsNames.size(); ++indI)
+    {
+        if (!_dataInfo.IsItemMandatory(itemsNames[indI]))
+        {
+            nonMandIndices.insert(indI);
+        }
+    }
+}
+
+
+void PdbMlSchema::_RemoveNonMandItems(vector<string>& itemsNames,
+  set<unsigned int>& nonMandIndices)
+{
+    for (set<unsigned int>::const_reverse_iterator it =
+      nonMandIndices.rbegin(); it != nonMandIndices.rend(); ++it)
+    {
+        itemsNames.erase(itemsNames.begin() + (*it));
+    }
+}
+

@@ -17,6 +17,7 @@
 
 #include <string>
 #include <vector>
+#include <set>
 
 #include "DataInfo.h"
 #include "ParentChild.h"
@@ -88,6 +89,12 @@ class PdbMlSchema
 
     void _WriteDataTypeAsElement(const std::string& itemName);
     void _WriteDataTypeAsAttribute(const std::string& itemName);
+
+    void _FindNonMandItemsIndices(std::set<unsigned int>& nonMandIndices,
+      const std::vector<std::string>& itemsNames);
+
+    void _RemoveNonMandItems(std::vector<std::string>& itemsNames,
+      std::set<unsigned int>& nonMandIndices);
 };
 
 #endif
