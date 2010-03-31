@@ -585,21 +585,11 @@ void PdbMlSchema::_WriteCategoryKeys(const string& catName)
         sort(sortedParComboKey.begin(), sortedParComboKey.end());
 
         // Check if all keys are category keys
-        bool allKeysAreCatKeys = true;
-        for (unsigned int i=0; i < sortedParComboKey.size(); i++)
-        {
-            string attribName;
-            CifString::GetItemFromCifItem(attribName, sortedParComboKey[i]);
-            if (!_dataInfo.IsKeyItem(catName, attribName))
-            {
-                allKeysAreCatKeys = false;
-                break;
-            }
-        }
-    
+        bool allKeysAreCatKeys = _AreAllKeyItems(catName, sortedParComboKey);
+
         if (allKeysAreCatKeys && (keys.size() == sortedParComboKey.size()))
         {
-            // Unique for all category keys
+            // Unique for all category keys. Skip.
             continue;
         }
 
@@ -663,16 +653,17 @@ void PdbMlSchema::_WriteCategoryKeysAndKeyrefs(const string& catName)
     // Start from 1, as keyId of 0 is reserved for all category keys
     unsigned int keyId = 1;
 
-#ifndef VLAD_NEW_1
+    // This is used in order to prepend keyrefs that point to
+    // category primary key. Category primary key consists of items
+    // that are all defined as category keys.
     unsigned int altKeyId = 0; 
-#endif
 
     for (unsigned int keyI = 0; keyI < parComboKeys.size(); ++keyI)
     {
         bool parentKeyWritten = false;
         bool allKeysAreCatKeys = true;
 
-        vector<vector<vector<string> > >& childrenKeys =
+        const vector<vector<vector<string> > >& childrenKeys =
           allChildrenKeys[keyI];
 
         unsigned int currKeyId = keyId;
@@ -706,17 +697,8 @@ void PdbMlSchema::_WriteCategoryKeysAndKeyrefs(const string& catName)
                 if (!parentKeyWritten)
                 {
                     // Check if all keys are category keys
-                    for (unsigned int i = 0; i < parComboKeys[keyI].size(); ++i)
-                    {
-                        string attribName;
-                        CifString::GetItemFromCifItem(attribName,
-                          parComboKeys[keyI][i]);
-                        if (!_dataInfo.IsKeyItem(catName, attribName))
-                        {
-                            allKeysAreCatKeys = false;
-                            break;
-                        }
-                    }
+                    allKeysAreCatKeys = _AreAllKeyItems(catName,
+                      parComboKeys[keyI]);
 
                     if (!allKeysAreCatKeys ||
                       !(catKeys.size() == parComboKeys[keyI].size()))
@@ -1552,6 +1534,23 @@ void PdbMlSchema::_FilterKeys(vector<vector<string> >& parComboKeys,
 
         allChildrenKeys.push_back(childrenKeys);
     } // for (all original parent combo keys)
+}
+
+
+bool PdbMlSchema::_AreAllKeyItems(const string& catName,
+  const vector<string>& itemsNames)
+{
+    for (unsigned int i = 0; i < itemsNames.size(); ++i)
+    {
+        string attribName;
+        CifString::GetItemFromCifItem(attribName, itemsNames[i]);
+        if (!_dataInfo.IsKeyItem(catName, attribName))
+        {
+            return (false);
+        }
+    }
+
+    return (true);
 }
 
 

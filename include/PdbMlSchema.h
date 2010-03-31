@@ -94,6 +94,9 @@ class PdbMlSchema
       std::vector<std::vector<std::vector<std::vector<std::string> > > >&
       allChildrenKeys, const std::string& catName);
 
+    bool _AreAllKeyItems(const std::string& catName,
+      const std::vector<std::string>& itemsNames);
+
     void _FindNonMandItemsIndices(std::set<unsigned int>& nonMandIndices,
       const std::vector<std::string>& itemsNames);
 
