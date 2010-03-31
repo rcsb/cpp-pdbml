@@ -90,6 +90,10 @@ class PdbMlSchema
     void _WriteDataTypeAsElement(const std::string& itemName);
     void _WriteDataTypeAsAttribute(const std::string& itemName);
 
+    void _FilterKeys(std::vector<std::vector<std::string> >& parComboKeys,
+      std::vector<std::vector<std::vector<std::vector<std::string> > > >&
+      allChildrenKeys, const std::string& catName);
+
     void _FindNonMandItemsIndices(std::set<unsigned int>& nonMandIndices,
       const std::vector<std::string>& itemsNames);
 
