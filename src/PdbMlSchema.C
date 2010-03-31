@@ -650,12 +650,13 @@ void PdbMlSchema::_WriteCategoryKeysAndKeyrefs(const string& catName)
 
     _FilterKeys(parComboKeys, allChildrenKeys, catName);
 
-    // Start from 1, as keyId of 0 is reserved for all category keys
+    // Start from 1, as keyId of 0 is reserved for category primary key.
+    // Category primary key consists of items that are all defined as
+    // category keys.
     unsigned int keyId = 1;
 
     // This is used in order to prepend keyrefs that point to
-    // category primary key. Category primary key consists of items
-    // that are all defined as category keys.
+    // category primary key.
     unsigned int altKeyId = 0; 
 
     for (unsigned int keyI = 0; keyI < parComboKeys.size(); ++keyI)
@@ -680,20 +681,6 @@ void PdbMlSchema::_WriteCategoryKeysAndKeyrefs(const string& catName)
             for (unsigned int childKeyI = 0; childKeyI <
               childrenKeys[childI].size(); ++childKeyI)
             {
-                multimap<string, string, StringLess> keyMap;
-
-                for (unsigned int keyItemI = 0; keyItemI <
-                  childrenKeys[childI][childKeyI].size(); ++keyItemI)
-                {
-                    string chAttribName;
-                    CifString::GetItemFromCifItem(chAttribName,
-                      childrenKeys[childI][childKeyI][keyItemI]);
-                    multimap<string, string, StringLess>::value_type
-                      valuePairIndex(parComboKeys[keyI][keyItemI],
-                      chAttribName);
-                    keyMap.insert(valuePairIndex);
-                }
-
                 if (!parentKeyWritten)
                 {
                     // Check if all keys are category keys
@@ -755,6 +742,20 @@ void PdbMlSchema::_WriteCategoryKeysAndKeyrefs(const string& catName)
 
                 string xPath = _nsPrefix + childCatElemName + string("/") +
                   _nsPrefix + childCatName;
+
+                multimap<string, string, StringLess> keyMap;
+
+                for (unsigned int keyItemI = 0; keyItemI <
+                  childrenKeys[childI][childKeyI].size(); ++keyItemI)
+                {
+                    string chAttribName;
+                    CifString::GetItemFromCifItem(chAttribName,
+                      childrenKeys[childI][childKeyI][keyItemI]);
+                    multimap<string, string, StringLess>::value_type
+                      valuePairIndex(parComboKeys[keyI][keyItemI],
+                      chAttribName);
+                    keyMap.insert(valuePairIndex);
+                }
 
                 vector<string> chKeys;
                 for (multimap<string, string, StringLess>::iterator iter =
