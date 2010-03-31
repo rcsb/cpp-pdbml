@@ -93,8 +93,13 @@ class PdbMlSchema
     void _FindNonMandItemsIndices(std::set<unsigned int>& nonMandIndices,
       const std::vector<std::string>& itemsNames);
 
+    void _FindToSkipItemsIndices(std::set<unsigned int>& indices,
+      const std::vector<std::string>& itemsNames);
+
     void _RemoveNonMandItems(std::vector<std::string>& itemsNames,
       std::set<unsigned int>& nonMandIndices);
+
+    bool _IsSkipParentItem(const std::string& itemName);
 };
 
 #endif

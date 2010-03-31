@@ -570,14 +570,101 @@ void PdbMlSchema::_WriteCategoryKeys(const string& catName)
     _xsdWriter.Indent();
     _xsdWriter.WriteUniqueClosingTag();
 
-    const vector<vector<string> >& parComboKeys =
+    const vector<vector<string> >& origParComboKeys =
      _parentChild.GetComboKeys(catName);
+
+#ifndef VLAD_NEW_1
+    vector<vector<string> > parComboKeys;
+
+    for (unsigned int keyI = 0; keyI < origParComboKeys.size(); ++keyI)
+    {
+        const vector<string>& currOrigParComboKey = origParComboKeys[keyI];
+
+        set<unsigned int> nonMandInd;
+
+        _FindNonMandItemsIndices(nonMandInd, currOrigParComboKey);
+
+#ifndef VLAD_TMP_DEL
+        _FindToSkipItemsIndices(nonMandInd, currOrigParComboKey);
+#endif
+
+#ifndef VLAD_NEW_2
+        set<unsigned int> allInd;
+        for (unsigned int indI = 0; indI < currOrigParComboKey.size(); ++indI)
+        {
+            allInd.insert(indI);
+        }
+
+        set<unsigned int> remInd;
+        set_difference(allInd.begin(), allInd.end(), nonMandInd.begin(),
+          nonMandInd.end(), inserter(remInd, remInd.end()));
+
+        bool allItemsOptional = true;
+
+        for (set<unsigned int>::const_iterator it = remInd.begin();
+          it != remInd.end(); ++it)
+        {
+            string attribName;
+            string catName;
+            CifString::GetItemFromCifItem(attribName, currOrigParComboKey[*it]);
+            CifString::GetCategoryFromCifItem(catName,
+              currOrigParComboKey[*it]);
+
+            if (_dataInfo.IsKeyItem(catName, attribName))
+            {
+                allItemsOptional = false;
+                break;
+            }
+        }
+
+        if ((allItemsOptional) || (remInd.size() < keys.size()))
+        {
+#ifdef VLAD_DEBUG
+            if (catName == "atom_site")
+                cerr << "Here" << remInd.size() << "; " << keys.size() << endl;
+#endif
+            continue;
+        }
+
+        vector<vector<vector<string> > >& origChildrenKeys =
+          _parentChild.GetChildrenKeys(currOrigParComboKey);
+
+        for (unsigned int childI = 0; childI < origChildrenKeys.size();
+          ++childI)
+        {
+            for (unsigned int childKeyI = 0; childKeyI <
+              origChildrenKeys[childI].size(); ++childKeyI)
+            {
+                const vector<string>& currChKey =
+                  origChildrenKeys[childI][childKeyI];
+
+                _FindNonMandItemsIndices(nonMandInd, currChKey);
+            }
+        }
+
+        if (nonMandInd.size() == currOrigParComboKey.size())
+        {
+            // All keys are non-mandatory.
+            continue;
+        }
+
+        vector<string> newParComboKey = currOrigParComboKey;
+        _RemoveNonMandItems(newParComboKey, nonMandInd);
+
+        parComboKeys.push_back(newParComboKey);
+    }
+#endif
+#endif
 
     // keyId 0 is reserved for all category keys
     unsigned keyId = 1;
 
     for (unsigned int keyI = 0; keyI < parComboKeys.size(); ++keyI)
     {
+#ifdef VLAD_DEBUG
+        if (catName == "atom_site")
+            cerr << "Begin: Here par key size:" << parComboKeys.size() << endl;
+#endif
         vector<string> sortedParComboKey = parComboKeys[keyI];
         sort(sortedParComboKey.begin(), sortedParComboKey.end());
 
@@ -650,6 +737,8 @@ void PdbMlSchema::_WriteCategoryKeys(const string& catName)
 
 void PdbMlSchema::_WriteCategoryKeysAndKeyrefs(const string& catName) 
 {
+    const vector<string>& catKeys = _dataInfo.GetCatKeys(catName);
+
     // Get all combo keys participating in parent-child relationships.
     const vector<vector<string> >& origParComboKeys =
      _parentChild.GetComboKeys(catName);
@@ -665,6 +754,45 @@ void PdbMlSchema::_WriteCategoryKeysAndKeyrefs(const string& catName)
         set<unsigned int> nonMandInd;
 
         _FindNonMandItemsIndices(nonMandInd, currOrigParComboKey);
+
+#ifndef VLAD_TMP_DEL
+        _FindToSkipItemsIndices(nonMandInd, currOrigParComboKey);
+#endif
+
+#ifndef VLAD_NEW_2
+        set<unsigned int> allInd;
+        for (unsigned int indI = 0; indI < currOrigParComboKey.size(); ++indI)
+        {
+            allInd.insert(indI);
+        }
+
+        set<unsigned int> remInd;
+        set_difference(allInd.begin(), allInd.end(), nonMandInd.begin(),
+          nonMandInd.end(), inserter(remInd, remInd.end()));
+
+        bool allItemsOptional = true;
+
+        for (set<unsigned int>::const_iterator it = remInd.begin();
+          it != remInd.end(); ++it)
+        {
+            string attribName;
+            string catName;
+            CifString::GetItemFromCifItem(attribName, currOrigParComboKey[*it]);
+            CifString::GetCategoryFromCifItem(catName,
+              currOrigParComboKey[*it]); 
+
+            if (_dataInfo.IsKeyItem(catName, attribName))
+            {
+                allItemsOptional = false;
+                break;
+            }
+        }
+
+        if ((allItemsOptional) || (remInd.size() < catKeys.size()))
+        {
+            continue;
+        }
+#endif
 
         vector<vector<vector<string> > >& origChildrenKeys =
           _parentChild.GetChildrenKeys(currOrigParComboKey);
@@ -719,8 +847,6 @@ void PdbMlSchema::_WriteCategoryKeysAndKeyrefs(const string& catName)
         allChildrenKeys.push_back(childrenKeys);
     } // for (all original parent combo keys)
 #endif
-
-    const vector<string>& catKeys = _dataInfo.GetCatKeys(catName);
 
     // Start from 1, as keyId of 0 is reserved for all category keys
     unsigned int keyId = 1;
@@ -881,6 +1007,13 @@ void PdbMlSchema::_WriteItemAttributes(const string& itemName,
         if (!_parentChild.IsInParentComboKeys(itemName))
         {
             _xsdWriter.WriteNillableAttribute("true");
+        }
+        else
+        {
+            if (_IsSkipParentItem(itemName))
+            {
+                _xsdWriter.WriteNillableAttribute("true");
+            }
         }
 #else
         _xsdWriter.WriteNillableAttribute("true");
@@ -1518,6 +1651,19 @@ void PdbMlSchema::_FindNonMandItemsIndices(set<unsigned int>& nonMandIndices,
 }
 
 
+void PdbMlSchema::_FindToSkipItemsIndices(set<unsigned int>& indices,
+  const vector<string>& itemsNames)
+{
+    for (unsigned int indI = 0; indI < itemsNames.size(); ++indI)
+    {
+        if (_IsSkipParentItem(itemsNames[indI]))
+        {
+            indices.insert(indI);
+        }
+    }
+}
+
+
 void PdbMlSchema::_RemoveNonMandItems(vector<string>& itemsNames,
   set<unsigned int>& nonMandIndices)
 {
@@ -1526,5 +1672,32 @@ void PdbMlSchema::_RemoveNonMandItems(vector<string>& itemsNames,
     {
         itemsNames.erase(itemsNames.begin() + (*it));
     }
+}
+
+
+bool PdbMlSchema::_IsSkipParentItem(const string& itemName)
+{
+    if (itemName == "_entity_poly_seq.num")
+        return (true);
+    else if (itemName == "_pdbx_poly_seq_scheme.seq_id")
+        return (true);
+    else if (itemName == "_atom_site.auth_comp_id")
+        return (true);
+    else if (itemName == "_atom_site.pdbx_PDB_ins_code")
+        return (true);
+    else if (itemName == "_pdbx_poly_seq_scheme.seq_id")
+        return (true);
+    else if (itemName == "_pdbx_poly_seq_scheme.pdb_ins_code")
+        return (true);
+    else if (itemName == "_atom_site.auth_seq_id")
+        return (true);
+    else if (itemName == "_pdbx_poly_seq_scheme.mon_id")
+        return (true);
+    else if (itemName == "_pdbx_poly_seq_scheme.auth_seq_num")
+        return (true);
+    else if (itemName == "_atom_site.label_seq_id")
+        return (true);
+
+    return (false);
 }
 
