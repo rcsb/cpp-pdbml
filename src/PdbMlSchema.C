@@ -793,7 +793,7 @@ void PdbMlSchema::_WriteItemAttributes(const string& itemName,
 
         _xsdWriter.WriteMinOccursAttribute(minOccurs);
         _xsdWriter.WriteMaxOccursAttribute("1");
-#ifndef VLAD_NEW
+
         if (!_parentChild.IsInParentComboKeys(itemName))
         {
             _xsdWriter.WriteNillableAttribute("true");
@@ -805,9 +805,6 @@ void PdbMlSchema::_WriteItemAttributes(const string& itemName,
                 _xsdWriter.WriteNillableAttribute("true");
             }
         }
-#else
-        _xsdWriter.WriteNillableAttribute("true");
-#endif
     }
 
     bool simpleTyping = _dataInfo.IsSimpleDataType(itemName);
@@ -1446,9 +1443,7 @@ void PdbMlSchema::_FilterKeys(vector<vector<string> >& parComboKeys,
 
         _FindNonMandItemsIndices(nonMandInd, currOrigParComboKey);
 
-#ifndef VLAD_TMP_DEL
         _FindToSkipItemsIndices(nonMandInd, currOrigParComboKey);
-#endif
 
         set<unsigned int> allInd;
         for (unsigned int indI = 0; indI < currOrigParComboKey.size(); ++indI)
