@@ -290,13 +290,17 @@ void PdbMlWriter::WriteTable(ISTable* tIn, vector<unsigned int>& widths,
                 continue;
             }
 
-            bool iNull = ((row[columnIndices[j]] == CifString::UnknownValue)
-              || ((row[columnIndices[j]]).empty()));
+            if ((row[columnIndices[j]] == CifString::UnknownValue)
+              || ((row[columnIndices[j]]).empty()))
+            {
+                // Skip unknown or empty values.
+                continue;
+            }
 
             Indent();
             WriteQualifiedOpeningTag(columnNames[j]);
 
-            if (iNull)
+            if (row[columnIndices[j]] == CifString::InapplicableValue)
             {
                 WriteNilAttribute("true");
                 WriteClosingTag();
