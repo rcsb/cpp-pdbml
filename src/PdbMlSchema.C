@@ -564,6 +564,12 @@ void PdbMlSchema::_WriteCategoryKeys(const string& catName)
         }
 #endif
 
+#ifdef VLAD_NO_KEYS_WITH_MANDATORY_DET_REFERENCES
+        if (_AreAllKeyItems(parComboKeys[keyI]))
+        {
+            continue;
+        }
+#endif
         //if (parComboKeys[keyI].size() <= keys.size())
         //{
         //    // All category keys. Skip.
@@ -1772,6 +1778,29 @@ bool PdbMlSchema::_IsSkipParentItem(const string& itemName)
     return (false);
 #endif
 
+#ifdef VLAD_NO_KEYS_WITH_MANDATORY_DET_REFERENCES
+    string attribName;
+    CifString::GetItemFromCifItem(attribName, itemName);
+
+    string catName;
+    CifString::GetCategoryFromCifItem(catName, itemName);
+
+    if (!_dataInfo.IsItemMandatory(itemName))
+    {
+        return (true);
+    }
+
+    if (CifExcept::CanBeInapplicable(itemName))
+    {
+        return (true);
+    }
+
+    //if (CifExcept::IsBadParentRelation(itemName))
+    //    return (true);
+
+    return (false);
+#endif
+
 #ifdef VLAD_NO_KEYS_BUT_MANDATORY_REFERENCES
     if (!_dataInfo.IsItemMandatory(itemName))
     {
@@ -1860,6 +1889,31 @@ bool PdbMlSchema::_IsSkipChildItem(const string& itemName)
         {
             return (true);
         }
+    }
+
+    return (false);
+#endif
+
+#ifdef VLAD_NO_KEYS_WITH_MANDATORY_DET_REFERENCES
+    string attribName;
+    CifString::GetItemFromCifItem(attribName, itemName);
+
+    string catName;
+    CifString::GetCategoryFromCifItem(catName, itemName);
+
+    if (!_dataInfo.IsItemMandatory(itemName))
+    {
+        return (true);
+    }
+
+    if (CifExcept::CanBeInapplicable(itemName))
+    {
+        return (true);
+    }
+
+    if (CifExcept::IsBadChildRelation(itemName))
+    {
+        return (true);
     }
 
     return (false);
