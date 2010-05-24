@@ -552,19 +552,15 @@ void PdbMlSchema::_WriteCategoryKeys(const string& catName)
     for (unsigned int keyI = 0; keyI < parComboKeys.size(); ++keyI)
     {
 #ifdef VLAD_KEYS_ONLY_REFERENCES
-        bool allKeysAreCatKeys = _AreAllKeyItems(catName, parComboKeys[keyI]);
-
-        if (allKeysAreCatKeys && (parComboKeys[keyI].size() <= keys.size()))
+        if (!_AreAllKeyItems(parComboKeys[keyI]))
         {
-            // All category keys. Skip.
             continue;
         }
 #endif
 
-#ifdef VLAD_KEYS_WITH_MANDATORY_REFERENCES
-        if (!_AreSubsetOfAllKeyItems(catName, parComboKeys[keyI]))
+#ifdef VLAD_KEYS_WITH_MANDATORY_DET_REFERENCES
+        if (!_AreSupersetOfAllKeyItems(parComboKeys[keyI]))
         {
-            // All category keys. Skip.
             continue;
         }
 #endif
@@ -731,17 +727,22 @@ void PdbMlSchema::_WriteCategoryKeysAndKeyrefs(const string& catName)
     {
 #ifdef VLAD_KEYS_ONLY_REFERENCES
         if (parComboKeys[keyI].size() < catKeys.size())
+        {
             continue;
+        }
 #endif
-#ifdef VLAD_NO_KEYS_BUT_MANDATORY_REFERENCES
-        if (parComboKeys[keyI].size() < catKeys.size())
+
+#ifdef VLAD_KEYS_WITH_MANDATORY_DET_REFERENCES
+        if (!_AreSupersetOfAllKeyItems(parComboKeys[keyI]))
+        {
             continue;
+        }
 #endif
 
 #ifdef VLAD_FIX_2
         bool parentKeyWritten = false;
 #else
-        bool allKeysAreCatKeys = _AreAllKeyItems(catName, parComboKeys[keyI]);
+        bool allKeysAreCatKeys = _AreAllKeyItems(parComboKeys[keyI]);
 
         if (!allKeysAreCatKeys || (catKeys.size() != parComboKeys[keyI].size()))
         {
@@ -777,8 +778,7 @@ void PdbMlSchema::_WriteCategoryKeysAndKeyrefs(const string& catName)
                 if (!parentKeyWritten)
                 {
                     // Check if all keys are category keys
-                    allKeysAreCatKeys = _AreAllKeyItems(catName,
-                      parComboKeys[keyI]);
+                    allKeysAreCatKeys = _AreAllKeyItems(parComboKeys[keyI]);
 
                     if (!allKeysAreCatKeys ||
                       !(catKeys.size() == parComboKeys[keyI].size()))
@@ -1712,26 +1712,54 @@ void PdbMlSchema::_FilterKeys(vector<vector<string> >& parComboKeys,
 }
 
 
-bool PdbMlSchema::_AreAllKeyItems(const string& catName,
-  const vector<string>& itemsNames)
+bool PdbMlSchema::_AreAllKeyItems(const vector<string>& itemsNames)
 {
+    if (itemsNames.empty())
+    {
+        return (false);
+    }
+
+    string catName;
+    CifString::GetCategoryFromCifItem(catName, itemsNames[0]);
+
+    const vector<string>& catKeys = _dataInfo.GetCatKeys(catName);
+
+    if (itemsNames.size() != catKeys.size())
+    {
+        return (false);
+    }
+
+    unsigned int keyItemsNum = 0;
+
     for (unsigned int i = 0; i < itemsNames.size(); ++i)
     {
         string attribName;
         CifString::GetItemFromCifItem(attribName, itemsNames[i]);
-        if (!_dataInfo.IsKeyItem(catName, attribName))
+        if (_dataInfo.IsKeyItem(catName, attribName))
         {
-            return (false);
+            keyItemsNum++;
         }
     }
 
-    return (true);
+    if (keyItemsNum == catKeys.size())
+    {
+        return (true);
+    }
+
+    return (false);
 }
 
 
-bool PdbMlSchema::_AreSubsetOfAllKeyItems(const string& catName,
-  const vector<string>& itemsNames)
+bool PdbMlSchema::_AreSupersetOfAllKeyItems(const vector<string>& itemsNames)
 {
+    if (itemsNames.empty())
+    {
+        return (false);
+    }
+
+    string catName;
+    CifString::GetCategoryFromCifItem(catName, itemsNames[0]);
+
     unsigned int keyItemsNum = 0;
 
     for (unsigned int i = 0; i < itemsNames.size(); ++i)
@@ -1746,7 +1774,7 @@ bool PdbMlSchema::_AreSubsetOfAllKeyItems(const string& catName,
 
     const vector<string>& catKeys = _dataInfo.GetCatKeys(catName);
 
-    if (keyItemsNum < catKeys.size())
+    if (keyItemsNum == catKeys.size())
     {
         return (true);
     }
@@ -1841,7 +1869,7 @@ bool PdbMlSchema::_IsSkipParentItem(const string& itemName)
     return (false);
 #endif
 
-#ifdef VLAD_KEYS_WITH_MANDATORY_REFERENCES
+#ifdef VLAD_KEYS_WITH_MANDATORY_DET_REFERENCES
     string attribName;
     CifString::GetItemFromCifItem(attribName, itemName);
 
@@ -1851,6 +1879,11 @@ bool PdbMlSchema::_IsSkipParentItem(const string& itemName)
     if (!_dataInfo.IsKeyItem(catName, attribName))
     {
         if (!_dataInfo.IsItemMandatory(itemName))
+        {
+            return (true);
+        }
+
+        if (CifExcept::CanBeInapplicable(itemName))
         {
             return (true);
         }
@@ -1929,7 +1962,7 @@ bool PdbMlSchema::_IsSkipChildItem(const string& itemName)
     return (false);
 #endif
 
-#ifdef VLAD_KEYS_WITH_MANDATORY_REFERENCES
+#ifdef VLAD_KEYS_WITH_MANDATORY_DET_REFERENCES
     string attribName;
     CifString::GetItemFromCifItem(attribName, itemName);
 
@@ -1942,11 +1975,15 @@ bool PdbMlSchema::_IsSkipChildItem(const string& itemName)
         {
             return (true);
         }
+
+        if (CifExcept::CanBeInapplicable(itemName))
+        {
+            return (true);
+        }
     }
 
     return (false);
 #endif
-
 
 
 #ifdef VLAD_NO_KEYS_BUT_MANDATORY_REFERENCES

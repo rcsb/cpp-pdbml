@@ -23,7 +23,7 @@
 #include "XsdWriter.h"
 
 #define VLAD_KEYS_ONLY_REFERENCES
-//#define VLAD_KEYS_WITH_MANDATORY_REFERENCES
+//#define VLAD_KEYS_WITH_MANDATORY_DET_REFERENCES
 //#define VLAD_NO_KEYS_BUT_MANDATORY_REFERENCES
 
 class PdbMlSchema
@@ -97,11 +97,9 @@ class PdbMlSchema
       std::vector<std::vector<std::vector<std::vector<std::string> > > >&
       allChildrenKeys, const std::string& catName);
 
-    bool _AreAllKeyItems(const std::string& catName,
-      const std::vector<std::string>& itemsNames);
+    bool _AreAllKeyItems(const std::vector<std::string>& itemsNames);
 
-    bool _AreSubsetOfAllKeyItems(const std::string& catName,
-      const std::vector<std::string>& itemsNames);
+    bool _AreSupersetOfAllKeyItems(const std::vector<std::string>& itemsNames);
 
     void _FindNonKeyItemsIndices(std::set<unsigned int>& nonMandIndices,
       const std::vector<std::string>& itemsNames);
