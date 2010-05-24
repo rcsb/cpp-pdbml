@@ -21,6 +21,7 @@
 #include "GenCont.h"
 #include "CifFile.h"
 #include "CifFileUtil.h"
+#include "CifExcept.h"
 #include "ParentChild.h"
 #include "XsdWriter.h"
 #include "PdbMlWriter.h"
@@ -528,6 +529,64 @@ void PdbMlSchema::_WriteCategoryKeys(const string& catName)
         return;
     }
 
+#ifndef VLAD_FIX_2
+    // Write category keys
+    vector<string> sortedCatKeys = keys;
+    sort(sortedCatKeys.begin(), sortedCatKeys.end());
+
+    _WriteComboKey(catName, sortedCatKeys, String::IntToString(0));
+
+
+#ifndef VLAD_TMP_DEL
+    // Write other keys
+    vector<vector<string> > parComboKeys;
+    vector<vector<vector<vector<string> > > > allChildrenKeys;
+
+    _FilterKeys(parComboKeys, allChildrenKeys, catName);
+
+    // Id of 0 is reserved for all category keys
+
+    // keyId 0 is reserved for all category keys
+    unsigned keyId = 1;
+
+    for (unsigned int keyI = 0; keyI < parComboKeys.size(); ++keyI)
+    {
+#ifdef VLAD_KEYS_ONLY_REFERENCES
+        bool allKeysAreCatKeys = _AreAllKeyItems(catName, parComboKeys[keyI]);
+
+        if (allKeysAreCatKeys && (parComboKeys[keyI].size() <= keys.size()))
+        {
+            // All category keys. Skip.
+            continue;
+        }
+#endif
+
+#ifdef VLAD_KEYS_WITH_MANDATORY_REFERENCES
+        if (!_AreSubsetOfAllKeyItems(catName, parComboKeys[keyI]))
+        {
+            // All category keys. Skip.
+            continue;
+        }
+#endif
+
+        if (parComboKeys[keyI].size() <= keys.size())
+        {
+            // All category keys. Skip.
+            continue;
+        }
+
+        vector<string> sortedParComboKey = parComboKeys[keyI];
+        sort(sortedParComboKey.begin(), sortedParComboKey.end());
+
+        _WriteComboKey(catName, sortedParComboKey,
+          String::IntToString(keyId), false);
+
+        keyId++;
+    }
+#endif
+#endif
+
+#ifdef VLAD_FIX_2
     _xsdWriter.Indent();
     _xsdWriter.WriteUniqueOpeningTag();
     _xsdWriter.WriteNameAttribute(catName + "Unique_0");
@@ -569,7 +628,6 @@ void PdbMlSchema::_WriteCategoryKeys(const string& catName)
 
     _xsdWriter.Indent();
     _xsdWriter.WriteUniqueClosingTag();
-
 
     vector<vector<string> > parComboKeys;
     vector<vector<vector<vector<string> > > > allChildrenKeys;
@@ -638,6 +696,7 @@ void PdbMlSchema::_WriteCategoryKeys(const string& catName)
         _xsdWriter.Indent();
         _xsdWriter.WriteUniqueClosingTag();
     }
+#endif
 }
 
 
@@ -650,10 +709,19 @@ void PdbMlSchema::_WriteCategoryKeysAndKeyrefs(const string& catName)
 
     _FilterKeys(parComboKeys, allChildrenKeys, catName);
 
+#ifndef VLAD_TRY_2
+    if (allChildrenKeys.empty())
+        return;
+#endif
+
     // Start from 1, as keyId of 0 is reserved for category primary key.
     // Category primary key consists of items that are all defined as
     // category keys.
+#ifdef VLAD_FIX_2
     unsigned int keyId = 1;
+#else
+    unsigned int keyId = 0;
+#endif
 
     // This is used in order to prepend keyrefs that point to
     // category primary key.
@@ -661,13 +729,38 @@ void PdbMlSchema::_WriteCategoryKeysAndKeyrefs(const string& catName)
 
     for (unsigned int keyI = 0; keyI < parComboKeys.size(); ++keyI)
     {
-        bool parentKeyWritten = false;
-        bool allKeysAreCatKeys = true;
+#ifdef VLAD_KEYS_ONLY_REFERENCES
+        if (parComboKeys[keyI].size() < catKeys.size())
+            continue;
+#endif
+#ifdef VLAD_NO_KEYS_BUT_MANDATORY_REFERENCES
+        if (parComboKeys[keyI].size() < catKeys.size())
+            continue;
+#endif
 
+#ifdef VLAD_FIX_2
+        bool parentKeyWritten = false;
+#else
+        bool allKeysAreCatKeys = _AreAllKeyItems(catName, parComboKeys[keyI]);
+
+        if (!allKeysAreCatKeys || (catKeys.size() != parComboKeys[keyI].size()))
+        {
+            keyId++;
+            // All category keys. Skip.
+        }
+
+        bool parentKeyWritten = true;
+#endif
+        //bool allKeysAreCatKeys = true;
+
+#ifndef VLAD_TRY_2
+        if (allChildrenKeys[keyI].empty())
+            continue;
+#endif
         const vector<vector<vector<string> > >& childrenKeys =
           allChildrenKeys[keyI];
 
-        unsigned int currKeyId = keyId;
+        //unsigned int currKeyId = keyId;
 
         for (unsigned int childI = 0; childI < childrenKeys.size(); ++childI)
         {
@@ -718,6 +811,7 @@ void PdbMlSchema::_WriteCategoryKeysAndKeyrefs(const string& catName)
                     parentKeyWritten = true;
                 }
 
+#ifdef VLAD_FIX_2
                 unsigned int usedKeyId = currKeyId;
                 string keyRefPrefix = String::IntToString(usedKeyId);
  
@@ -728,13 +822,38 @@ void PdbMlSchema::_WriteCategoryKeysAndKeyrefs(const string& catName)
                     keyRefPrefix = String::IntToString(usedKeyId) + "_" +
                       String::IntToString(altKeyId);
                 }
+#else
+                unsigned int usedKeyId = keyId;
+                if (allKeysAreCatKeys &&
+                  (catKeys.size() == parComboKeys[keyI].size()))
+                {
+                    usedKeyId = 0;
+                }
 
+                string keyRefPrefix = String::IntToString(keyI) + "_" +
+                  String::IntToString(usedKeyId);
+#endif
                 string keyRefName = catName + "Keyref" + "_" +
                   keyRefPrefix + "_" +
                   String::IntToString(childI) + "_" +
                   String::IntToString(childKeyI);
+
                 string keyName = _nsPrefix + catName + "Key" + "_" +
                   String::IntToString(usedKeyId);
+#ifndef VLAD_DEBUG
+                if (keyName == "chem_comp_atomKey_0")
+                {
+                    int a = 1;
+                    int b = a + 1;
+                    b++;
+                }
+#endif
+
+#ifndef VLAD_FIX_2
+                if (usedKeyId != 0)
+                    keyName = _nsPrefix + catName + "Unique" + "_" +
+                      String::IntToString(usedKeyId);
+#endif
 
                 string childCatElemName;
                 PdbMlSchema::MakeCategoryElementName(childCatElemName,
@@ -794,16 +913,15 @@ void PdbMlSchema::_WriteItemAttributes(const string& itemName,
         _xsdWriter.WriteMinOccursAttribute(minOccurs);
         _xsdWriter.WriteMaxOccursAttribute("1");
 
+#ifdef VLAD_DEL_2
         if (!_parentChild.IsInParentComboKeys(itemName))
         {
-            _xsdWriter.WriteNillableAttribute("true");
         }
-        else
+#endif
+
+        if (_IsSkipParentItem(itemName) && _IsSkipChildItem(itemName))
         {
-            if (_IsSkipParentItem(itemName))
-            {
-                _xsdWriter.WriteNillableAttribute("true");
-            }
+            _xsdWriter.WriteNillableAttribute("true");
         }
     }
 
@@ -1163,10 +1281,6 @@ void format_cif_descriptionXML(string& obuf, const string& str)
                   attribName[attribName.size() - 1] == ';' ||
                   attribName[attribName.size() - 1] == ',')
                 {
-#ifdef VLAD_TEST
-                    cerr << "Wierd attrib name: \"" << attribName <<
-                      "\"" << ", for token: \"" << word << "\"" << endl;
-#endif
                     attribName.erase(attribName.size() - 1);
                 }
 
@@ -1310,7 +1424,7 @@ void PdbMlSchema::MakeCategoryTypeName(string& catTypeName,
 
 
 void PdbMlSchema::_WriteComboKey(const string& catName, 
-  const vector<string>& keyItems, const string& append)
+  const vector<string>& keyItems, const string& append, const bool asXsdKey)
 {
     bool emptyKeyItems = true;
 
@@ -1328,9 +1442,22 @@ void PdbMlSchema::_WriteComboKey(const string& catName,
         return;
     }
 
+    string keyType;
+
     _xsdWriter.Indent();
-    _xsdWriter.WriteKeyOpeningTag();
-    _xsdWriter.WriteNameAttribute(catName + "Key" + "_" + append);
+
+    if (asXsdKey)
+    {
+        keyType = "Key";
+        _xsdWriter.WriteKeyOpeningTag();
+    }
+    else
+    {
+        keyType = "Unique";
+        _xsdWriter.WriteUniqueOpeningTag();
+    }
+
+    _xsdWriter.WriteNameAttribute(catName + keyType + "_" + append);
     _xsdWriter.WriteClosingBracket();
 
     _xsdWriter.IncrementIndent();
@@ -1373,7 +1500,15 @@ void PdbMlSchema::_WriteComboKey(const string& catName,
     _xsdWriter.DecrementIndent();
 
     _xsdWriter.Indent();
-    _xsdWriter.WriteKeyClosingTag();
+
+    if (asXsdKey)
+    {
+        _xsdWriter.WriteKeyClosingTag();
+    }
+    else
+    {
+        _xsdWriter.WriteUniqueClosingTag();
+    }
 }
 
 
@@ -1441,9 +1576,19 @@ void PdbMlSchema::_FilterKeys(vector<vector<string> >& parComboKeys,
 
         set<unsigned int> nonMandInd;
 
-        _FindNonMandItemsIndices(nonMandInd, currOrigParComboKey);
+        //_FindNonMandItemsIndices(nonMandInd, currOrigParComboKey);
 
-        _FindToSkipItemsIndices(nonMandInd, currOrigParComboKey);
+        //_FindNonKeyItemsIndices(nonMandInd, currOrigParComboKey);
+
+        _FindToSkipParentItemsIndices(nonMandInd, currOrigParComboKey);
+
+#ifndef VLAD_TMP
+        // This ifndef can be safely removed, since eliminating anything
+        // from parent combo key will make that key non-unique and XML
+        // validation will fail.
+        if (!nonMandInd.empty())
+            continue;
+#endif
 
         set<unsigned int> allInd;
         for (unsigned int indI = 0; indI < currOrigParComboKey.size(); ++indI)
@@ -1473,14 +1618,26 @@ void PdbMlSchema::_FilterKeys(vector<vector<string> >& parComboKeys,
             }
         }
 
-        if ((allItemsOptional) || (remInd.size() < catKeys.size()))
+#ifndef VLAD_KEYS_ONLY_REFERENCES
+        if (remInd.size() < catKeys.size())
         {
             continue;
+        }
+#endif
+
+        if ((allItemsOptional) || (remInd.size() < catKeys.size()))
+        {
+#ifdef VLAD_TMP_2
+            continue;
+#else
+            ;
+#endif
         }
 
         vector<vector<vector<string> > >& origChildrenKeys =
           _parentChild.GetChildrenKeys(currOrigParComboKey);
 
+#ifndef VLAD_DEL
         for (unsigned int childI = 0; childI < origChildrenKeys.size();
           ++childI)
         {
@@ -1490,15 +1647,20 @@ void PdbMlSchema::_FilterKeys(vector<vector<string> >& parComboKeys,
                 const vector<string>& currChKey =
                   origChildrenKeys[childI][childKeyI];
 
-                _FindNonMandItemsIndices(nonMandInd, currChKey);
+                _FindToSkipChildItemsIndices(nonMandInd, currChKey);
+                //_FindNonKeyItemsIndices(nonMandInd, currChKey);
+                //_FindNonMandItemsIndices(nonMandInd, currChKey);
             }
         }
+#endif
 
+#ifdef VLAD_TMP_2
         if (nonMandInd.size() == currOrigParComboKey.size())
         {
             // All keys are non-mandatory.
             continue;
         }
+#endif
 
         vector<string> newParComboKey = currOrigParComboKey;
         _RemoveNonMandItems(newParComboKey, nonMandInd);
@@ -1522,13 +1684,30 @@ void PdbMlSchema::_FilterKeys(vector<vector<string> >& parComboKeys,
                 vector<string> newChKey = currChKey;
                 _RemoveNonMandItems(newChKey, nonMandInd);
  
-                newChKeys.push_back(newChKey);
+#ifndef VLAD_TRY_2
+                if (!newChKey.empty())
+                {
+                    newChKeys.push_back(newChKey);
+                }
+#endif
             }
 
-            childrenKeys.push_back(newChKeys);
+#ifndef VLAD_TRY_2
+            if (!newChKeys.empty())
+            {
+                childrenKeys.push_back(newChKeys);
+            }
+#endif
         } // for (all child categories)
 
+#ifdef VLAD_TRY_2
+        if (!childrenKeys.empty())
+        {
+            allChildrenKeys.push_back(childrenKeys);
+        }
+#else
         allChildrenKeys.push_back(childrenKeys);
+#endif
     } // for (all original parent combo keys)
 }
 
@@ -1550,6 +1729,51 @@ bool PdbMlSchema::_AreAllKeyItems(const string& catName,
 }
 
 
+bool PdbMlSchema::_AreSubsetOfAllKeyItems(const string& catName,
+  const vector<string>& itemsNames)
+{
+    unsigned int keyItemsNum = 0;
+
+    for (unsigned int i = 0; i < itemsNames.size(); ++i)
+    {
+        string attribName;
+        CifString::GetItemFromCifItem(attribName, itemsNames[i]);
+        if (_dataInfo.IsKeyItem(catName, attribName))
+        {
+            keyItemsNum++;
+        }
+    }
+
+    const vector<string>& catKeys = _dataInfo.GetCatKeys(catName);
+
+    if (keyItemsNum < catKeys.size())
+    {
+        return (true);
+    }
+
+    return (false);
+}
+
+
+void PdbMlSchema::_FindNonKeyItemsIndices(set<unsigned int>& nonMandIndices,
+  const vector<string>& itemsNames)
+{
+    for (unsigned int indI = 0; indI < itemsNames.size(); ++indI)
+    {
+        string attribName;
+        CifString::GetItemFromCifItem(attribName, itemsNames[indI]);
+
+        string catName;
+        CifString::GetCategoryFromCifItem(catName, itemsNames[indI]);
+
+        if (!_dataInfo.IsKeyItem(catName, attribName))
+        {
+            nonMandIndices.insert(indI);
+        }
+    }
+}
+
+
 void PdbMlSchema::_FindNonMandItemsIndices(set<unsigned int>& nonMandIndices,
   const vector<string>& itemsNames)
 {
@@ -1563,12 +1787,25 @@ void PdbMlSchema::_FindNonMandItemsIndices(set<unsigned int>& nonMandIndices,
 }
 
 
-void PdbMlSchema::_FindToSkipItemsIndices(set<unsigned int>& indices,
+void PdbMlSchema::_FindToSkipParentItemsIndices(set<unsigned int>& indices,
   const vector<string>& itemsNames)
 {
     for (unsigned int indI = 0; indI < itemsNames.size(); ++indI)
     {
         if (_IsSkipParentItem(itemsNames[indI]))
+        {
+            indices.insert(indI);
+        }
+    }
+}
+
+
+void PdbMlSchema::_FindToSkipChildItemsIndices(set<unsigned int>& indices,
+  const vector<string>& itemsNames)
+{
+    for (unsigned int indI = 0; indI < itemsNames.size(); ++indI)
+    {
+        if (_IsSkipChildItem(itemsNames[indI]))
         {
             indices.insert(indI);
         }
@@ -1589,27 +1826,159 @@ void PdbMlSchema::_RemoveNonMandItems(vector<string>& itemsNames,
 
 bool PdbMlSchema::_IsSkipParentItem(const string& itemName)
 {
-    if (itemName == "_entity_poly_seq.num")
+#ifdef VLAD_KEYS_ONLY_REFERENCES
+    string attribName;
+    CifString::GetItemFromCifItem(attribName, itemName);
+
+    string catName;
+    CifString::GetCategoryFromCifItem(catName, itemName);
+
+    if (!_dataInfo.IsKeyItem(catName, attribName))
+    {
         return (true);
-    else if (itemName == "_pdbx_poly_seq_scheme.seq_id")
+    }
+
+    return (false);
+#endif
+
+#ifdef VLAD_KEYS_WITH_MANDATORY_REFERENCES
+    string attribName;
+    CifString::GetItemFromCifItem(attribName, itemName);
+
+    string catName;
+    CifString::GetCategoryFromCifItem(catName, itemName);
+
+    if (!_dataInfo.IsKeyItem(catName, attribName))
+    {
+        if (!_dataInfo.IsItemMandatory(itemName))
+        {
+            return (true);
+        }
+    }
+
+    return (false);
+#endif
+
+#ifdef VLAD_NO_KEYS_BUT_MANDATORY_REFERENCES
+    if (!_dataInfo.IsItemMandatory(itemName))
+    {
         return (true);
-    else if (itemName == "_atom_site.auth_comp_id")
+    }
+#else
+    if (!_dataInfo.IsItemMandatory(itemName))
+    {
+#ifndef VLAD_EXCLUDE_NON_MANDATORY
+        if (CifExcept::CanBeInapplicable(itemName))
+            return (true);
+
+        return (false);
+#else
         return (true);
-    else if (itemName == "_atom_site.pdbx_PDB_ins_code")
+#endif
+    }
+#endif
+
+    if (CifExcept::CanBeInapplicable(itemName))
         return (true);
-    else if (itemName == "_pdbx_poly_seq_scheme.seq_id")
-        return (true);
-    else if (itemName == "_pdbx_poly_seq_scheme.pdb_ins_code")
-        return (true);
-    else if (itemName == "_atom_site.auth_seq_id")
-        return (true);
-    else if (itemName == "_pdbx_poly_seq_scheme.mon_id")
-        return (true);
-    else if (itemName == "_pdbx_poly_seq_scheme.auth_seq_num")
-        return (true);
-    else if (itemName == "_atom_site.label_seq_id")
+
+    if (CifExcept::IsBadParentRelation(itemName))
         return (true);
 
     return (false);
+
+    //if (itemName == "_pdbx_poly_seq_scheme.auth_seq_num")
+    //    return (true);
+    //else if (itemName == "_entity_poly_seq.num")
+    //    return (true);
+    //else if (itemName == "_pdbx_poly_seq_scheme.seq_id")
+    //    return (true);
+    //else if (itemName == "_atom_site.auth_comp_id")
+    //    return (true);
+    //else if (itemName == "_atom_site.pdbx_PDB_ins_code")
+    //    return (true);
+    //else if (itemName == "_pdbx_poly_seq_scheme.seq_id")
+    //    return (true);
+    //else if (itemName == "_pdbx_poly_seq_scheme.pdb_ins_code")
+    //    return (true);
+    //else if (itemName == "_atom_site.auth_seq_id")
+    //    return (true);
+    //else if (itemName == "_pdbx_poly_seq_scheme.mon_id")
+    //    return (true);
+    //else if (itemName == "_atom_site.label_seq_id")
+    //    return (true);
+    //else if (itemName == "_struct_biol.id")
+    //    return (true);
+
+}
+
+
+bool PdbMlSchema::_IsSkipChildItem(const string& itemName)
+{
+#ifdef VLAD_KEYS_ONLY_REFERENCES
+    string attribName;
+    CifString::GetItemFromCifItem(attribName, itemName);
+
+    string catName;
+    CifString::GetCategoryFromCifItem(catName, itemName);
+
+    if (!_dataInfo.IsKeyItem(catName, attribName))
+    {
+        return (true);
+    }
+
+    return (false);
+#endif
+
+#ifdef VLAD_KEYS_WITH_MANDATORY_REFERENCES
+    string attribName;
+    CifString::GetItemFromCifItem(attribName, itemName);
+
+    string catName;
+    CifString::GetCategoryFromCifItem(catName, itemName);
+
+    if (!_dataInfo.IsKeyItem(catName, attribName))
+    {
+        if (!_dataInfo.IsItemMandatory(itemName))
+        {
+            return (true);
+        }
+    }
+
+    return (false);
+#endif
+
+
+
+#ifdef VLAD_NO_KEYS_BUT_MANDATORY_REFERENCES
+    if (!_dataInfo.IsItemMandatory(itemName))
+    {
+        return (true);
+    }
+#else
+    if (!_dataInfo.IsItemMandatory(itemName))
+    {
+#ifndef VLAD_EXCLUDE_NON_MANDATORY
+        if (CifExcept::CanBeInapplicable(itemName))
+            return (true);
+
+        return (false);
+#else
+        return (true);
+#endif
+    }
+#endif
+
+    if (CifExcept::CanBeInapplicable(itemName))
+        return (true);
+
+    return (false);
+
+    // VLAD - DOCUMENT: These items are child combo keys and can have
+    // values of "?"
+
+    //if (itemName == "_pdbx_refine_tls_group.beg_label_asym_id")
+    //    return (true);
+    //else if (itemName == "_software.citation_id")
+    //    return (true);
 }
 

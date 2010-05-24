@@ -16,6 +16,7 @@
 
 #include "GenCont.h"
 #include "CifString.h"
+#include "CifExcept.h"
 #include "PdbMlSchema.h"
 #include "PdbMlWriter.h"
 
@@ -296,6 +297,18 @@ void PdbMlWriter::WriteTable(ISTable* tIn, vector<unsigned int>& widths,
                 // Skip unknown or empty values.
                 continue;
             }
+
+#ifdef VLAD_DONT_IGNORE_MANDATORY
+            if (row[columnIndices[j]] == CifString::UnknownValue)
+            {
+                string itemName;
+
+                CifString::MakeCifItem(itemName, tableName, columnNames[j]);
+
+                if (CifExcept::CanBeUnknown(itemName))
+                    continue;
+            }
+#endif
 
             Indent();
             WriteQualifiedOpeningTag(columnNames[j]);

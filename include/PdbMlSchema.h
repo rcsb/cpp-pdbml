@@ -14,7 +14,6 @@
 #ifndef PDBMLSCHEMA_H
 #define PDBMLSCHEMA_H
 
-
 #include <string>
 #include <vector>
 #include <set>
@@ -23,6 +22,9 @@
 #include "ParentChild.h"
 #include "XsdWriter.h"
 
+#define VLAD_KEYS_ONLY_REFERENCES
+//#define VLAD_KEYS_WITH_MANDATORY_REFERENCES
+//#define VLAD_NO_KEYS_BUT_MANDATORY_REFERENCES
 
 class PdbMlSchema
 {
@@ -76,7 +78,8 @@ class PdbMlSchema
     void _WriteCategoryKeysAndKeyrefs(const std::string& catName);
 
     void _WriteComboKey(const std::string& catName,
-      const std::vector<std::string>& keyItems, const std::string& append);
+      const std::vector<std::string>& keyItems, const std::string& append,
+      const bool asXsdKey = true);
 
     void _WriteKeyRef(const std::string& keyRefName,
       const std::string& keyName, const std::string& xPath,
@@ -97,16 +100,27 @@ class PdbMlSchema
     bool _AreAllKeyItems(const std::string& catName,
       const std::vector<std::string>& itemsNames);
 
+    bool _AreSubsetOfAllKeyItems(const std::string& catName,
+      const std::vector<std::string>& itemsNames);
+
+    void _FindNonKeyItemsIndices(std::set<unsigned int>& nonMandIndices,
+      const std::vector<std::string>& itemsNames);
+
     void _FindNonMandItemsIndices(std::set<unsigned int>& nonMandIndices,
       const std::vector<std::string>& itemsNames);
 
-    void _FindToSkipItemsIndices(std::set<unsigned int>& indices,
+    void _FindToSkipParentItemsIndices(std::set<unsigned int>& indices,
+      const std::vector<std::string>& itemsNames);
+
+    void _FindToSkipChildItemsIndices(std::set<unsigned int>& indices,
       const std::vector<std::string>& itemsNames);
 
     void _RemoveNonMandItems(std::vector<std::string>& itemsNames,
       std::set<unsigned int>& nonMandIndices);
 
     bool _IsSkipParentItem(const std::string& itemName);
+
+    bool _IsSkipChildItem(const std::string& itemName);
 };
 
 #endif
