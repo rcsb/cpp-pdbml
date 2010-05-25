@@ -547,7 +547,6 @@ void PdbMlSchema::_WriteCategoryKeys(const string& catName)
 
     // Id of 0 is reserved for all category keys
 
-    // keyId 0 is reserved for all category keys
     unsigned keyId = 1;
 
     for (unsigned int keyI = 0; keyI < parComboKeys.size(); ++keyI)
@@ -577,11 +576,6 @@ void PdbMlSchema::_WriteCategoryKeys(const string& catName)
             continue;
         }
 #endif
-        //if (parComboKeys[keyI].size() <= keys.size())
-        //{
-        //    // All category keys. Skip.
-        //    continue;
-        //}
 
         vector<string> sortedParComboKey = parComboKeys[keyI];
         sort(sortedParComboKey.begin(), sortedParComboKey.end());
@@ -1463,7 +1457,7 @@ void PdbMlSchema::_FilterKeys(vector<vector<string> >& parComboKeys,
   vector<vector<vector<vector<string> > > >& allChildrenKeys,
   const string& catName)
 {
-    const vector<string>& catKeys = _dataInfo.GetCatKeys(catName);
+    //const vector<string>& catKeys = _dataInfo.GetCatKeys(catName);
 
     // Get all combo keys participating in parent-child relationships.
     const vector<vector<string> >& origParComboKeys =
@@ -1475,10 +1469,6 @@ void PdbMlSchema::_FilterKeys(vector<vector<string> >& parComboKeys,
 
         set<unsigned int> nonMandInd;
 
-        //_FindNonMandItemsIndices(nonMandInd, currOrigParComboKey);
-
-        //_FindNonKeyItemsIndices(nonMandInd, currOrigParComboKey);
-
         _FindToSkipParentItemsIndices(nonMandInd, currOrigParComboKey);
 
 #ifndef VLAD_TMP
@@ -1489,6 +1479,7 @@ void PdbMlSchema::_FilterKeys(vector<vector<string> >& parComboKeys,
             continue;
 #endif
 
+#ifdef VLAD_DEL
         set<unsigned int> allInd;
         for (unsigned int indI = 0; indI < currOrigParComboKey.size(); ++indI)
         {
@@ -1517,13 +1508,6 @@ void PdbMlSchema::_FilterKeys(vector<vector<string> >& parComboKeys,
             }
         }
 
-#ifndef VLAD_KEYS_ONLY_REFERENCES
-        if (remInd.size() < catKeys.size())
-        {
-            continue;
-        }
-#endif
-
         if ((allItemsOptional) || (remInd.size() < catKeys.size()))
         {
 #ifdef VLAD_TMP_2
@@ -1532,11 +1516,11 @@ void PdbMlSchema::_FilterKeys(vector<vector<string> >& parComboKeys,
             ;
 #endif
         }
+#endif
 
         vector<vector<vector<string> > >& origChildrenKeys =
           _parentChild.GetChildrenKeys(currOrigParComboKey);
 
-#ifndef VLAD_DEL
         for (unsigned int childI = 0; childI < origChildrenKeys.size();
           ++childI)
         {
@@ -1547,11 +1531,8 @@ void PdbMlSchema::_FilterKeys(vector<vector<string> >& parComboKeys,
                   origChildrenKeys[childI][childKeyI];
 
                 _FindToSkipChildItemsIndices(nonMandInd, currChKey);
-                //_FindNonKeyItemsIndices(nonMandInd, currChKey);
-                //_FindNonMandItemsIndices(nonMandInd, currChKey);
             }
         }
-#endif
 
 #ifdef VLAD_TMP_2
         if (nonMandInd.size() == currOrigParComboKey.size())
@@ -1583,30 +1564,19 @@ void PdbMlSchema::_FilterKeys(vector<vector<string> >& parComboKeys,
                 vector<string> newChKey = currChKey;
                 _RemoveNonMandItems(newChKey, nonMandInd);
  
-#ifndef VLAD_TRY_2
                 if (!newChKey.empty())
                 {
                     newChKeys.push_back(newChKey);
                 }
-#endif
             }
 
-#ifndef VLAD_TRY_2
             if (!newChKeys.empty())
             {
                 childrenKeys.push_back(newChKeys);
             }
-#endif
         } // for (all child categories)
 
-#ifdef VLAD_TRY_2
-        if (!childrenKeys.empty())
-        {
-            allChildrenKeys.push_back(childrenKeys);
-        }
-#else
         allChildrenKeys.push_back(childrenKeys);
-#endif
     } // for (all original parent combo keys)
 }
 
