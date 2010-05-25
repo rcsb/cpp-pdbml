@@ -570,6 +570,13 @@ void PdbMlSchema::_WriteCategoryKeys(const string& catName)
             continue;
         }
 #endif
+
+#ifdef VLAD_NO_KEYS_NO_MANDATORY_DET_REFERENCES
+        if (_AreAllKeyItems(parComboKeys[keyI]))
+        {
+            continue;
+        }
+#endif
         //if (parComboKeys[keyI].size() <= keys.size())
         //{
         //    // All category keys. Skip.
@@ -579,17 +586,18 @@ void PdbMlSchema::_WriteCategoryKeys(const string& catName)
         vector<string> sortedParComboKey = parComboKeys[keyI];
         sort(sortedParComboKey.begin(), sortedParComboKey.end());
 
-        _WriteComboKey(catName, sortedParComboKey,
-          String::IntToString(keyId), false);
-
-        keyId++;
+        if (_WriteComboKey(catName, sortedParComboKey,
+          String::IntToString(keyId), false))
+        {
+            keyId++;
+        }
     }
 }
 
 
 void PdbMlSchema::_WriteCategoryKeysAndKeyrefs(const string& catName) 
 {
-    const vector<string>& catKeys = _dataInfo.GetCatKeys(catName);
+    //const vector<string>& catKeys = _dataInfo.GetCatKeys(catName);
 
     vector<vector<string> > parComboKeys;
     vector<vector<vector<vector<string> > > > allChildrenKeys;
@@ -612,7 +620,7 @@ void PdbMlSchema::_WriteCategoryKeysAndKeyrefs(const string& catName)
 
     // This is used in order to prepend keyrefs that point to
     // category primary key.
-    unsigned int altKeyId = 0; 
+    //unsigned int altKeyId = 0; 
 
     for (unsigned int keyI = 0; keyI < parComboKeys.size(); ++keyI)
     {
@@ -634,13 +642,9 @@ void PdbMlSchema::_WriteCategoryKeysAndKeyrefs(const string& catName)
         bool parentKeyWritten = false;
 #else
 
-        if (!_AreAllKeyItems(parComboKeys[keyI]))
-        //if (!allKeysAreCatKeys || (catKeys.size() != parComboKeys[keyI].size()))
-        {
-            keyId++;
-        }
-
+#ifdef VLAD_DELETED
         bool parentKeyWritten = true;
+#endif
 #endif
         //bool allKeysAreCatKeys = true;
 
@@ -650,6 +654,12 @@ void PdbMlSchema::_WriteCategoryKeysAndKeyrefs(const string& catName)
 #endif
         const vector<vector<vector<string> > >& childrenKeys =
           allChildrenKeys[keyI];
+
+        if (!_AreAllKeyItems(parComboKeys[keyI]))
+        //if (!allKeysAreCatKeys || (catKeys.size() != parComboKeys[keyI].size()))
+        {
+            keyId++;
+        }
 
         //unsigned int currKeyId = keyId;
 
@@ -665,6 +675,7 @@ void PdbMlSchema::_WriteCategoryKeysAndKeyrefs(const string& catName)
             for (unsigned int childKeyI = 0; childKeyI <
               childrenKeys[childI].size(); ++childKeyI)
             {
+#ifdef VLAD_DELETED
                 if (!parentKeyWritten)
                 {
                     // Check if all keys are category keys
@@ -697,7 +708,7 @@ void PdbMlSchema::_WriteCategoryKeysAndKeyrefs(const string& catName)
 
                     parentKeyWritten = true;
                 }
-
+#endif
 #ifdef VLAD_FIX_2
                 unsigned int usedKeyId = currKeyId;
                 string keyRefPrefix = String::IntToString(usedKeyId);
@@ -1309,7 +1320,7 @@ void PdbMlSchema::MakeCategoryTypeName(string& catTypeName,
 }
 
 
-void PdbMlSchema::_WriteComboKey(const string& catName, 
+bool PdbMlSchema::_WriteComboKey(const string& catName, 
   const vector<string>& keyItems, const string& append, const bool asXsdKey)
 {
     bool emptyKeyItems = true;
@@ -1325,7 +1336,7 @@ void PdbMlSchema::_WriteComboKey(const string& catName,
 
     if (emptyKeyItems)
     {
-        return;
+        return (false);
     }
 
     string keyType;
@@ -1395,6 +1406,8 @@ void PdbMlSchema::_WriteComboKey(const string& catName,
     {
         _xsdWriter.WriteUniqueClosingTag();
     }
+
+    return (true);
 }
 
 
@@ -1801,33 +1814,25 @@ bool PdbMlSchema::_IsSkipParentItem(const string& itemName)
     return (false);
 #endif
 
-#ifdef VLAD_NO_KEYS_BUT_MANDATORY_REFERENCES
-    if (!_dataInfo.IsItemMandatory(itemName))
-    {
-        return (true);
-    }
-#else
-    if (!_dataInfo.IsItemMandatory(itemName))
-    {
-#ifndef VLAD_EXCLUDE_NON_MANDATORY
-        if (CifExcept::CanBeInapplicable(itemName))
-            return (true);
+#ifdef VLAD_NO_KEYS_NO_MANDATORY_DET_REFERENCES
+    string attribName;
+    CifString::GetItemFromCifItem(attribName, itemName);
 
-        return (false);
-#else
-        return (true);
-#endif
-    }
-#endif
+    string catName;
+    CifString::GetCategoryFromCifItem(catName, itemName);
 
     if (CifExcept::CanBeInapplicable(itemName))
+    {
         return (true);
+    }
 
-    if (CifExcept::IsBadParentRelation(itemName))
-        return (true);
+    //if (CifExcept::IsBadParentRelation(itemName))
+    //    return (true);
 
     return (false);
+#endif
 
+    // VLAD - INVESTIGATE THIS
     //if (itemName == "_pdbx_poly_seq_scheme.auth_seq_num")
     //    return (true);
     //else if (itemName == "_entity_poly_seq.num")
@@ -1850,7 +1855,6 @@ bool PdbMlSchema::_IsSkipParentItem(const string& itemName)
     //    return (true);
     //else if (itemName == "_struct_biol.id")
     //    return (true);
-
 }
 
 
@@ -1919,30 +1923,26 @@ bool PdbMlSchema::_IsSkipChildItem(const string& itemName)
     return (false);
 #endif
 
+#ifdef VLAD_NO_KEYS_NO_MANDATORY_DET_REFERENCES
+    string attribName;
+    CifString::GetItemFromCifItem(attribName, itemName);
 
-#ifdef VLAD_NO_KEYS_BUT_MANDATORY_REFERENCES
-    if (!_dataInfo.IsItemMandatory(itemName))
-    {
-        return (true);
-    }
-#else
-    if (!_dataInfo.IsItemMandatory(itemName))
-    {
-#ifndef VLAD_EXCLUDE_NON_MANDATORY
-        if (CifExcept::CanBeInapplicable(itemName))
-            return (true);
-
-        return (false);
-#else
-        return (true);
-#endif
-    }
-#endif
+    string catName;
+    CifString::GetCategoryFromCifItem(catName, itemName);
 
     if (CifExcept::CanBeInapplicable(itemName))
+    {
         return (true);
+    }
+
+    if (CifExcept::IsBadChildRelation(itemName))
+    {
+        return (true);
+    }
 
     return (false);
+#endif
+
 
     // VLAD - DOCUMENT: These items are child combo keys and can have
     // values of "?"

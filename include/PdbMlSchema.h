@@ -25,6 +25,7 @@
 #define VLAD_KEYS_ONLY_REFERENCES
 //#define VLAD_KEYS_WITH_MANDATORY_DET_REFERENCES
 //#define VLAD_NO_KEYS_WITH_MANDATORY_DET_REFERENCES
+//#define VLAD_NO_KEYS_NO_MANDATORY_DET_REFERENCES
 
 class PdbMlSchema
 {
@@ -77,7 +78,7 @@ class PdbMlSchema
 
     void _WriteCategoryKeysAndKeyrefs(const std::string& catName);
 
-    void _WriteComboKey(const std::string& catName,
+    bool _WriteComboKey(const std::string& catName,
       const std::vector<std::string>& keyItems, const std::string& append,
       const bool asXsdKey = true);
 
