@@ -731,7 +731,7 @@ void PdbMlSchema::_WriteItemAttributes(const string& itemName,
         _xsdWriter.WriteMinOccursAttribute(minOccurs);
         _xsdWriter.WriteMaxOccursAttribute("1");
 
-        if (_IsSkipParentItem(itemName) && _IsSkipChildItem(itemName))
+        if (_IsSkipParentItem(itemName) || _IsSkipChildItem(itemName))
         {
             _xsdWriter.WriteNillableAttribute("true");
         }
@@ -1393,6 +1393,15 @@ void PdbMlSchema::_FilterKeys(vector<vector<string> >& parComboKeys,
         _FindToSkipParentItemsIndices(nonMandInd, currOrigParComboKey);
 
 #ifdef VLAD_KEYS_ONLY_REFERENCES
+        // If this code is eliminated, the reduced parent key may not be
+        // unique any more and XSD unique validation will fail. This code
+        // can only be safely removed, once all the parent keys are supersets
+        // of category key.
+        if (!nonMandInd.empty())
+            continue;
+#endif
+
+#ifdef VLAD_KEYS_WITH_MANDATORY_DET_REFERENCES
         // If this code is eliminated, the reduced parent key may not be
         // unique any more and XSD unique validation will fail. This code
         // can only be safely removed, once all the parent keys are supersets
