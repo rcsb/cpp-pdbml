@@ -7,7 +7,6 @@
 // For localtime, time, tm on SGI platform. Investigate and remove this.
 #include "time.h"
 
-#include <string>
 #include <vector>
 #include <set>
 #include <map>
@@ -28,9 +27,16 @@
 #include "PdbMlSchema.h"
 
 
+#ifndef VLAD_MORE_WORK
+using std::pair;
+using std::make_pair;
+#endif
 using std::string;
 using std::vector;
 using std::set;
+#ifndef VLAD_MORE_WORK
+using std::map;
+#endif
 using std::multimap;
 using std::ostringstream;
 using std::cerr;
@@ -543,6 +549,15 @@ void PdbMlSchema::_WriteCategoryKeys(const string& catName)
     vector<vector<string> > parComboKeys;
     vector<vector<vector<vector<string> > > > allChildrenKeys;
 
+#ifndef VLAD_DEBUG
+    if (catName == "chem_comp")
+    {
+        unsigned int a = 1;
+        unsigned int b = a + 1;
+        b++;
+    }
+#endif
+
     _FilterKeys(parComboKeys, allChildrenKeys, catName);
 
     // Id of 0 is reserved for all category keys
@@ -551,6 +566,19 @@ void PdbMlSchema::_WriteCategoryKeys(const string& catName)
 
     for (unsigned int keyI = 0; keyI < parComboKeys.size(); ++keyI)
     {
+#ifndef VLAD_DEBUG
+        if (parComboKeys[keyI].empty())
+        {
+            cerr << "Parent key empty" << endl;
+            continue;
+        }
+
+        if (allChildrenKeys[keyI].empty())
+        {
+            cerr << "all Children keys empty" << endl;
+            continue; 
+        }
+#endif
 #ifdef VLAD_KEYS_WITH_MANDATORY_DET_REFERENCES
         if (_AreAllKeyItems(parComboKeys[keyI]))
         {
@@ -568,6 +596,19 @@ void PdbMlSchema::_WriteCategoryKeys(const string& catName)
         {
             continue;
         }
+#ifndef VLAD_DEBUG
+        if (parComboKeys[keyI].empty())
+        {
+            cerr << "Parent key empty" << endl;
+            continue;
+        }
+
+        if (allChildrenKeys[keyI].empty())
+        {
+            cerr << "all Children keys empty" << endl;
+            continue; 
+        }
+#endif
 #endif
 
 #ifdef VLAD_NO_KEYS_NO_MANDATORY_DET_REFERENCES
@@ -575,6 +616,20 @@ void PdbMlSchema::_WriteCategoryKeys(const string& catName)
         {
             continue;
         }
+#ifndef VLAD_DEBUG
+        if (parComboKeys[keyI].empty())
+        {
+            cerr << "Parent key empty" << endl;
+            continue;
+        }
+
+        if (allChildrenKeys[keyI].empty())
+        {
+            cerr << "all Children keys empty" << endl;
+            continue; 
+        }
+#endif
+
 #endif
 
         vector<string> sortedParComboKey = parComboKeys[keyI];
@@ -1431,6 +1486,11 @@ void PdbMlSchema::_FilterKeys(vector<vector<string> >& parComboKeys,
         vector<vector<vector<string> > >& origChildrenKeys =
           _parentChild.GetChildrenKeys(currOrigParComboKey);
 
+#ifndef VLAD_MORE_WORK
+        // Define a map of pair of unsigned ints and sets
+        map<pair<unsigned int, unsigned int>, set<unsigned int> > chSkipInd;
+#endif
+
         for (unsigned int childI = 0; childI < origChildrenKeys.size();
           ++childI)
         {
@@ -1440,9 +1500,68 @@ void PdbMlSchema::_FilterKeys(vector<vector<string> >& parComboKeys,
                 const vector<string>& currChKey =
                   origChildrenKeys[childI][childKeyI];
 
+#ifndef VLAD_MORE_WORK
+                set<unsigned int> chKeySkipInd;
+
+                _FindToSkipChildItemsIndices(chKeySkipInd, currChKey);
+
+                // Insert a pair of (childI, childKeyI) and chKeySkipInd
+                // in the map
+                map<pair<unsigned int, unsigned int>, set<unsigned int> >::value_type valuePairIndex(make_pair(childI, childKeyI), chKeySkipInd);
+                chSkipInd.insert(valuePairIndex);
+#else
+
                 _FindToSkipChildItemsIndices(nonMandInd, currChKey);
+#endif
             }
         }
+
+#ifndef VLAD_MORE_WORK
+        for (unsigned int parKeyI = 0; parKeyI < currOrigParComboKey.size();
+          ++parKeyI)
+        {
+            unsigned int totalNumKeys = 0;
+            unsigned int numIndexInKeys = 0;
+
+            for (unsigned int childI = 0; childI < origChildrenKeys.size();
+              ++childI)
+            {
+                for (unsigned int childKeyI = 0; childKeyI <
+                  origChildrenKeys[childI].size(); ++childKeyI)
+                {
+                    totalNumKeys += origChildrenKeys[childI].size();
+
+                    const set<unsigned int>& chSet =
+                      chSkipInd[make_pair(childI, childKeyI)];
+
+                    if (chSet.find(parKeyI) != chSet.end())
+                    {
+                        numIndexInKeys++;
+                    }
+                }
+            }
+
+            // If counter equals the sum of all keys, it means that that
+            // item index is skipped in all keys.
+            if (numIndexInKeys == totalNumKeys)
+            {
+                nonMandInd.insert(parKeyI);
+
+                for (unsigned int childI = 0; childI < origChildrenKeys.size();
+                  ++childI)
+                {
+                    for (unsigned int childKeyI = 0; childKeyI <
+                      origChildrenKeys[childI].size(); ++childKeyI)
+                    {
+                        set<unsigned int>& chSet =
+                          chSkipInd[make_pair(childI, childKeyI)];
+
+                        chSet.erase(parKeyI);
+                    }
+                }
+            }
+        }
+#endif
 
         vector<string> newParComboKey = currOrigParComboKey;
         _RemoveNonMandItems(newParComboKey, nonMandInd);
@@ -1466,6 +1585,16 @@ void PdbMlSchema::_FilterKeys(vector<vector<string> >& parComboKeys,
                 vector<string> newChKey = currChKey;
                 _RemoveNonMandItems(newChKey, nonMandInd);
  
+#ifndef VLAD_MORE_WORK
+                const set<unsigned int>& chSet =
+                  chSkipInd[make_pair(childI, childKeyI)];
+
+                if (!chSet.empty())
+                {
+                    continue;
+                }
+#endif
+
                 if (!newChKey.empty())
                 {
                     newChKeys.push_back(newChKey);
@@ -1604,6 +1733,14 @@ void PdbMlSchema::_FindToSkipChildItemsIndices(set<unsigned int>& indices,
 {
     for (unsigned int indI = 0; indI < itemsNames.size(); ++indI)
     {
+#ifndef VLAD_DEBUG
+        if (itemsNames[indI] == "_em_2d_crystal_grow.citation_id")
+        {
+            unsigned int a = 1;
+            unsigned b = a + 1;
+            b++;
+        }
+#endif
         if (_IsSkipChildItem(itemsNames[indI]))
         {
             indices.insert(indI);
