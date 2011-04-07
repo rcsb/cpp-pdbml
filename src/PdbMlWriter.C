@@ -385,8 +385,8 @@ void PdbMlWriter::_writeAlternateAtomSiteTable(ISTable* tIn)
     if (!_io || !tIn)
         return;
 
-    int inW[18];
-    string inC[18];
+    int inW[20];
+    string inC[20];
 
     inC[0]  = "group_PDB";
     inC[1]  = "pdbx_PDB_model_num";
@@ -406,8 +406,10 @@ void PdbMlWriter::_writeAlternateAtomSiteTable(ISTable* tIn)
     inC[15] = "Cartn_z";
     inC[16] = "occupancy";
     inC[17] = "B_iso_or_equiv";
+    inC[18] = "label_entity_id";
+    inC[19] = "pdbx_formal_charge";
 
-    for (unsigned int inCind = 0; inCind < 18; ++inCind)
+    for (unsigned int inCind = 0; inCind < 20; ++inCind)
     {
         if (!tIn->IsColumnPresent(inC[inCind]))
           inC[inCind].clear();
@@ -431,6 +433,8 @@ void PdbMlWriter::_writeAlternateAtomSiteTable(ISTable* tIn)
     inW[15]=  9;
     inW[16] = 7;
     inW[17] = 7;
+    inW[18] = 5;
+    inW[19] = 4;
 
     Indent();
     WriteOpeningTag("category_atom_record", true);
@@ -449,7 +453,7 @@ void PdbMlWriter::_writeAlternateAtomSiteTable(ISTable* tIn)
 
         WriteClosingBracket(true);
 
-        for (unsigned int j = 0; j < 18; ++j)
+        for (unsigned int j = 0; j < 20; ++j)
         {
             if (inC[j].empty())
                 continue;
