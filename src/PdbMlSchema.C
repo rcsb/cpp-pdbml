@@ -7,6 +7,7 @@
 // For localtime, time, tm on SGI platform. Investigate and remove this.
 #include "time.h"
 
+#include <stdexcept>
 #include <vector>
 #include <set>
 #include <map>
@@ -27,6 +28,7 @@
 #include "PdbMlSchema.h"
 
 
+using std::exception;
 using std::pair;
 using std::make_pair;
 using std::string;
@@ -384,6 +386,13 @@ void PdbMlSchema::_WriteDatablockElement(const vector<string>& categories)
 void PdbMlSchema::_WriteCategoryDocumentation(const string& catName) 
 {
     // Category level documentation
+    if (catName.empty())
+    {
+        cerr << "ERROR: Empty category name detected in \""\
+          "PdbMlSchema::_WriteCategoryDocumentation()\"" << endl;
+
+        return;
+    }
 
     _xsdWriter.Indent();
     _xsdWriter.WriteAnnotationOpeningTag();
@@ -428,51 +437,59 @@ void PdbMlSchema::_WriteCategoryDocumentation(const string& catName)
         string exampleCIF;
         format_cif_example(exampleCIF, exampleCase[i]);
 
-        ostringstream exampleXMLStream;
-
-        CifFile* fobjIn = ParseCifString(exampleCIF);
-
-        const string& parsingDiags = fobjIn->GetParsingDiags();
-
-        if (!parsingDiags.empty())
+        try
         {
-            cerr << "Diags for category " << catName << "  = " <<
-              parsingDiags << endl;
-        }
+            ostringstream exampleXMLStream;
 
-        PdbMlWriter pdbMlWriter(exampleXMLStream, _ns, _dataInfo);
+            CifFile* fobjIn = ParseCifString(exampleCIF);
 
-        vector<string> blockNames;
-        fobjIn->GetBlockNames(blockNames);
-        for (unsigned int ib = 0; ib < blockNames.size(); ++ib)
-        {
-            const string& blockName = blockNames[ib];
-            Block& block = fobjIn->GetBlock(blockName);
-            vector<string> tableNames;
-            block.GetTableNames(tableNames);
-            for (unsigned int it = 0; it < tableNames.size(); ++it)
+            const string& parsingDiags = fobjIn->GetParsingDiags();
+
+            if (!parsingDiags.empty())
             {
-                if (!_dataInfo.IsCatDefined(tableNames[it]))
-                {
-                    cerr << " Skipping conversion to XML of the unknown "\
-                      "table \"" << tableNames[it] << "\"" << endl;
-                    continue;
-                }
+                cerr << "Diags for category " << catName << "  = " <<
+                  parsingDiags << endl;
+            }
 
-                ISTable* t = block.GetTablePtr(tableNames[it]);
-                if ((t != NULL) && (t->GetNumRows() > 0))
+            PdbMlWriter pdbMlWriter(exampleXMLStream, _ns, _dataInfo);
+
+            vector<string> blockNames;
+            fobjIn->GetBlockNames(blockNames);
+            for (unsigned int ib = 0; ib < blockNames.size(); ++ib)
+            {
+                const string& blockName = blockNames[ib];
+                Block& block = fobjIn->GetBlock(blockName);
+                vector<string> tableNames;
+                block.GetTableNames(tableNames);
+                for (unsigned int it = 0; it < tableNames.size(); ++it)
                 {
-                    vector<unsigned int> emptyWidths;
-                    pdbMlWriter.WriteTable(t, emptyWidths);
+                    if (!_dataInfo.IsCatDefined(tableNames[it]))
+                    {
+                        cerr << " Skipping conversion to XML of the unknown "\
+                          "table \"" << tableNames[it] << "\"" << endl;
+                        continue;
+                    }
+
+                    ISTable* t = block.GetTablePtr(tableNames[it]);
+                    if ((t != NULL) && (t->GetNumRows() > 0))
+                    {
+                        vector<unsigned int> emptyWidths;
+                        pdbMlWriter.WriteTable(t, emptyWidths);
+                    }
                 }
             }
+
+            delete (fobjIn);
+
+            _xsdWriter._FormatTextDataXML(exampleXMLStream.str());
+            if (!CifString::IsEmptyValue(exampleXMLStream.str()))
+                _xsdWriter.WriteNewLine();
         }
-
-        delete (fobjIn);
-
-        _xsdWriter._FormatTextDataXML(exampleXMLStream.str());
-        if (!CifString::IsEmptyValue(exampleXMLStream.str()))
-            _xsdWriter.WriteNewLine();
+        catch (const exception& exc)
+        {
+            cerr << "Skipping conversion to XML of the bad CIF "\
+              "segment \"" << exampleCase[i] << "\"" << endl;
+        }
     }
 
     _xsdWriter.WriteNewLine();
