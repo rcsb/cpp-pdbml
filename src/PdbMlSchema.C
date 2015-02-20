@@ -947,7 +947,6 @@ void PdbMlSchema::_WriteDataTypeAsElement(const string& itemName)
   }
   else if (iRange)
   {
-#ifndef VLAD_OLD_IMPL
     vector<string> incRangeMin;
     vector<string> incRangeMax;
 
@@ -978,21 +977,6 @@ void PdbMlSchema::_WriteDataTypeAsElement(const string& itemName)
     _xsdWriter.WriteBaseAttribute(iType);
     _xsdWriter.WriteClosingBracket();
 
-
-    /*
-    REMOVE
-    _xsdWriter.Indent();
-    _xsdWriter.WriteSimpleTypeOpeningTag();
-
-    _xsdWriter.IncrementIndent();
-
-    _xsdWriter.Indent();
-    _xsdWriter.WriteRestrictionOpeningTag();
-    _xsdWriter.WriteBaseAttribute(iType);
-    _xsdWriter.WriteClosingBracket();
-
-    REMOVE
-    */
     _xsdWriter.IncrementIndent();
 
     if ((!newRangeMin.empty()) && (newRangeMin != CifString::InapplicableValue))
@@ -1021,18 +1005,9 @@ void PdbMlSchema::_WriteDataTypeAsElement(const string& itemName)
     _xsdWriter.Indent();
     _xsdWriter.WriteSimpleTypeClosingTag();
 
-
-    /*
-    REMOVE
-    _xsdWriter.DecrementIndent();
-
-    _xsdWriter.Indent();
-    _xsdWriter.WriteSimpleTypeClosingTag();
-    */
     }
     else
     {
-
     
     _xsdWriter.Indent();
     _xsdWriter.WriteSimpleTypeOpeningTag();
@@ -1119,88 +1094,6 @@ void PdbMlSchema::_WriteDataTypeAsElement(const string& itemName)
     _xsdWriter.WriteSimpleTypeClosingTag();
 
     }
-#else // VLAD_OLD_IMPL
-
-    _xsdWriter.Indent();
-    _xsdWriter.WriteSimpleTypeOpeningTag();
-
-    _xsdWriter.IncrementIndent();
-
-    _xsdWriter.Indent();
-    _xsdWriter.WriteUnionOpeningTag();
-
-    _xsdWriter.IncrementIndent();
-
-    for (unsigned int i=0; i < rangeMin.size(); i++)
-    {
-      _xsdWriter.Indent();
-      _xsdWriter.WriteSimpleTypeOpeningTag();
-
-      _xsdWriter.IncrementIndent();
-
-      _xsdWriter.Indent();
-      _xsdWriter.WriteRestrictionOpeningTag();
-      _xsdWriter.WriteBaseAttribute(iType);
-      _xsdWriter.WriteClosingBracket();
-
-      _xsdWriter.IncrementIndent();
-      if (String::IsCiEqual(rangeMin[i], rangeMax[i]))
-      {
-
-        if (!CifString::IsEmptyValue(rangeMin[i]))
-        {
-          _xsdWriter.Indent();
-          _xsdWriter.WriteMinInclusiveOpeningTag();
-          _xsdWriter.WriteValueAttribute(rangeMin[i]);
-          _xsdWriter.WriteClosingTag();
-	}
-
-	if (!CifString::IsEmptyValue(rangeMax[i]))
-        {
-          _xsdWriter.Indent();
-          _xsdWriter.WriteMaxInclusiveOpeningTag();
-          _xsdWriter.WriteValueAttribute(rangeMax[i]);
-          _xsdWriter.WriteClosingTag();
-	}
-      }
-      else
-      {
-	if (!CifString::IsEmptyValue(rangeMin[i]))
-        {
-          _xsdWriter.Indent();
-          _xsdWriter.WriteMinExclusiveOpeningTag();
-          _xsdWriter.WriteValueAttribute(rangeMin[i]);
-          _xsdWriter.WriteClosingTag();
-	}
-	if (!CifString::IsEmptyValue(rangeMax[i]))
-        {
-          _xsdWriter.Indent();
-          _xsdWriter.WriteMaxExclusiveOpeningTag();
-          _xsdWriter.WriteValueAttribute(rangeMax[i]);
-          _xsdWriter.WriteClosingTag();
-	}
-      }
-      _xsdWriter.DecrementIndent();
-
-      _xsdWriter.Indent();
-      _xsdWriter.WriteRestrictionClosingTag();
-
-      _xsdWriter.DecrementIndent();
-
-      _xsdWriter.Indent();
-      _xsdWriter.WriteSimpleTypeClosingTag();
-    }
-
-    _xsdWriter.DecrementIndent();
-
-    _xsdWriter.Indent();
-    _xsdWriter.WriteUnionClosingTag();
-
-    _xsdWriter.DecrementIndent();
-
-    _xsdWriter.Indent();
-    _xsdWriter.WriteSimpleTypeClosingTag();
-#endif // VLAD_OLD_IMPL
   }
   else if (!units.empty())
   {
