@@ -120,6 +120,12 @@ class PdbMlSchema
     bool _IsSkipParentItem(const std::string& itemName);
 
     bool _IsSkipChildItem(const std::string& itemName);
+
+    void _AggregateInclusiveRanges(const std::vector<std::string>& rangeMin,
+      const std::vector<std::string>& rangeMax,
+      std::vector<std::string>& incRangeMin,
+      std::vector<std::string>& incRangeMax);
+    bool _HasMultipleSubRanges(const std::string& itemName);
 };
 
 #endif

@@ -714,6 +714,15 @@ void PdbMlSchema::_WriteCategoryKeysAndKeyrefs(const string& catName)
                 for (unsigned int keyItemI = 0; keyItemI <
                   childrenKeys[childI][childKeyI].size(); ++keyItemI)
                 {
+                    if (_HasMultipleSubRanges(childrenKeys[childI][childKeyI][keyItemI]))
+                    {
+                        cerr << "WARNING: Detected multiple item ranges"\
+                          " for item " + childrenKeys[childI][childKeyI][keyItemI] + ", which participates in"\
+                          " key/keyref relationship as a union. Xerces"\
+                          " validator will flag all instances of this data"\
+                          " as errors, while other validators will not."
+                          << endl;
+                    }
                     string chAttribName;
                     CifString::GetItemFromCifItem(chAttribName,
                       childrenKeys[childI][childKeyI][keyItemI]);
@@ -873,6 +882,23 @@ void PdbMlSchema::_WriteDataTypeAsElement(const string& itemName)
   {
       iRange = true;
   }
+  
+  bool allEmptyBoundaries = true;
+  for (unsigned int i=0; i < rangeMin.size(); i++)
+  {
+      if (CifString::IsEmptyValue(rangeMin[i]) &&
+        CifString::IsEmptyValue(rangeMax[i]))
+          continue;
+
+      allEmptyBoundaries = false;
+      break;
+  }
+
+  if (allEmptyBoundaries)
+      iRange = false;
+  else
+      iRange = true;
+
 
   // 
   //  Assume that we may either have  range restrictions or an enumeration
@@ -921,6 +947,180 @@ void PdbMlSchema::_WriteDataTypeAsElement(const string& itemName)
   }
   else if (iRange)
   {
+#ifndef VLAD_OLD_IMPL
+    vector<string> incRangeMin;
+    vector<string> incRangeMax;
+
+    _AggregateInclusiveRanges(rangeMin, rangeMax, incRangeMin, incRangeMax);
+
+    /*
+    VG_DEBUG
+    if (incRangeMin.size() > 1)
+    {
+        cerr << "INTERESTING INFO: More than one sub-range"\
+          " for item " << itemName << endl;
+    }
+    VG_DEBUG
+    */
+
+    if (incRangeMin.size() == 1)
+    {
+    string newRangeMin = incRangeMin[0];
+    string newRangeMax = incRangeMax[0];
+
+    _xsdWriter.Indent();
+    _xsdWriter.WriteSimpleTypeOpeningTag();
+
+    _xsdWriter.IncrementIndent();
+
+    _xsdWriter.Indent();
+    _xsdWriter.WriteRestrictionOpeningTag();
+    _xsdWriter.WriteBaseAttribute(iType);
+    _xsdWriter.WriteClosingBracket();
+
+
+    /*
+    REMOVE
+    _xsdWriter.Indent();
+    _xsdWriter.WriteSimpleTypeOpeningTag();
+
+    _xsdWriter.IncrementIndent();
+
+    _xsdWriter.Indent();
+    _xsdWriter.WriteRestrictionOpeningTag();
+    _xsdWriter.WriteBaseAttribute(iType);
+    _xsdWriter.WriteClosingBracket();
+
+    REMOVE
+    */
+    _xsdWriter.IncrementIndent();
+
+    if ((!newRangeMin.empty()) && (newRangeMin != CifString::InapplicableValue))
+    {
+        _xsdWriter.Indent();
+        _xsdWriter.WriteMinInclusiveOpeningTag();
+        _xsdWriter.WriteValueAttribute(newRangeMin);
+        _xsdWriter.WriteClosingTag();
+    }
+
+    if ((!newRangeMax.empty()) && (newRangeMax != CifString::InapplicableValue))
+    {
+        _xsdWriter.Indent();
+        _xsdWriter.WriteMaxInclusiveOpeningTag();
+        _xsdWriter.WriteValueAttribute(newRangeMax);
+        _xsdWriter.WriteClosingTag();
+    }
+
+    _xsdWriter.DecrementIndent();
+
+    _xsdWriter.Indent();
+    _xsdWriter.WriteRestrictionClosingTag();
+
+    _xsdWriter.DecrementIndent();
+
+    _xsdWriter.Indent();
+    _xsdWriter.WriteSimpleTypeClosingTag();
+
+
+    /*
+    REMOVE
+    _xsdWriter.DecrementIndent();
+
+    _xsdWriter.Indent();
+    _xsdWriter.WriteSimpleTypeClosingTag();
+    */
+    }
+    else
+    {
+
+    
+    _xsdWriter.Indent();
+    _xsdWriter.WriteSimpleTypeOpeningTag();
+
+    _xsdWriter.IncrementIndent();
+
+    _xsdWriter.Indent();
+    _xsdWriter.WriteUnionOpeningTag();
+
+    _xsdWriter.IncrementIndent();
+
+    for (unsigned int i=0; i < rangeMin.size(); i++)
+    {
+       if (CifString::IsEmptyValue(rangeMin[i]) &&
+          CifString::IsEmptyValue(rangeMax[i]))
+            continue;
+
+      _xsdWriter.Indent();
+      _xsdWriter.WriteSimpleTypeOpeningTag();
+
+      _xsdWriter.IncrementIndent();
+
+      _xsdWriter.Indent();
+      _xsdWriter.WriteRestrictionOpeningTag();
+      _xsdWriter.WriteBaseAttribute(iType);
+      _xsdWriter.WriteClosingBracket();
+
+      _xsdWriter.IncrementIndent();
+      if (String::IsCiEqual(rangeMin[i], rangeMax[i]))
+      {
+
+        if (!CifString::IsEmptyValue(rangeMin[i]))
+        {
+          _xsdWriter.Indent();
+          _xsdWriter.WriteMinInclusiveOpeningTag();
+          _xsdWriter.WriteValueAttribute(rangeMin[i]);
+          _xsdWriter.WriteClosingTag();
+	}
+
+	if (!CifString::IsEmptyValue(rangeMax[i]))
+        {
+          _xsdWriter.Indent();
+          _xsdWriter.WriteMaxInclusiveOpeningTag();
+          _xsdWriter.WriteValueAttribute(rangeMax[i]);
+          _xsdWriter.WriteClosingTag();
+	}
+      }
+      else
+      {
+	if (!CifString::IsEmptyValue(rangeMin[i]))
+        {
+          _xsdWriter.Indent();
+          _xsdWriter.WriteMinExclusiveOpeningTag();
+          _xsdWriter.WriteValueAttribute(rangeMin[i]);
+          _xsdWriter.WriteClosingTag();
+	}
+	if (!CifString::IsEmptyValue(rangeMax[i]))
+        {
+          _xsdWriter.Indent();
+          _xsdWriter.WriteMaxExclusiveOpeningTag();
+          _xsdWriter.WriteValueAttribute(rangeMax[i]);
+          _xsdWriter.WriteClosingTag();
+	}
+      }
+      _xsdWriter.DecrementIndent();
+
+      _xsdWriter.Indent();
+      _xsdWriter.WriteRestrictionClosingTag();
+
+      _xsdWriter.DecrementIndent();
+
+      _xsdWriter.Indent();
+      _xsdWriter.WriteSimpleTypeClosingTag();
+    }
+
+    _xsdWriter.DecrementIndent();
+
+    _xsdWriter.Indent();
+    _xsdWriter.WriteUnionClosingTag();
+
+    _xsdWriter.DecrementIndent();
+
+    _xsdWriter.Indent();
+    _xsdWriter.WriteSimpleTypeClosingTag();
+
+    }
+#else // VLAD_OLD_IMPL
+
     _xsdWriter.Indent();
     _xsdWriter.WriteSimpleTypeOpeningTag();
 
@@ -1000,6 +1200,7 @@ void PdbMlSchema::_WriteDataTypeAsElement(const string& itemName)
 
     _xsdWriter.Indent();
     _xsdWriter.WriteSimpleTypeClosingTag();
+#endif // VLAD_OLD_IMPL
   }
   else if (!units.empty())
   {
@@ -1920,5 +2121,107 @@ bool PdbMlSchema::_IsSkipChildItem(const string& itemName)
     //    return (true);
     //else if (itemName == "_software.citation_id")
     //    return (true);
+}
+
+
+void PdbMlSchema::_AggregateInclusiveRanges(const vector<string>& rangeMin,
+  const vector<string>& rangeMax, vector<string>& incRangeMin,
+  vector<string>& incRangeMax)
+{
+    vector<string> boundaries;
+
+    vector<string> lowerRanges;
+    vector<string> higherRanges;
+
+    // Process ranges that are single values
+    for (unsigned int rangeI = 0; rangeI < rangeMin.size(); ++rangeI)
+    {
+        if (String::IsCiEqual(rangeMin[rangeI], rangeMax[rangeI]))
+        {
+            boundaries.push_back(rangeMin[rangeI]);
+        }
+    }
+
+    // Extend input ranges to include single values
+    for (unsigned int rangeI = 0; rangeI < rangeMin.size(); ++rangeI)
+    {
+        bool foundLower = false;
+        for (unsigned int boundI = 0; boundI < boundaries.size(); ++boundI)
+        {
+            if (String::IsCiEqual(rangeMin[rangeI], boundaries[boundI]))
+            {
+                foundLower = true;
+                lowerRanges.push_back(boundaries[boundI]);
+                break;
+            }
+        }
+
+        if (!foundLower)
+        {
+            lowerRanges.push_back(string());
+        }
+
+        bool foundHigher = false;
+        for (unsigned int boundI = 0; boundI < boundaries.size(); ++boundI)
+        {
+            if (String::IsCiEqual(rangeMax[rangeI], boundaries[boundI]))
+            {
+                higherRanges.push_back(boundaries[boundI]);
+                foundHigher = true;
+                break;
+            }
+
+        }
+
+        if (!foundHigher)
+        {
+            higherRanges.push_back(string());
+        }
+    }
+
+    for (unsigned int rangeI = 0; rangeI < rangeMin.size(); ++rangeI)
+    {
+        if (String::IsCiEqual(rangeMin[rangeI], rangeMax[rangeI]))
+        {
+            continue;
+        }
+
+        if (!lowerRanges[rangeI].empty())
+        {
+            incRangeMin.push_back(lowerRanges[rangeI]);
+        }
+        else
+        {
+            incRangeMin.push_back(rangeMin[rangeI]);
+        }
+
+        if (!higherRanges[rangeI].empty())
+        {
+            incRangeMax.push_back(higherRanges[rangeI]);
+        }
+        else
+        {
+            incRangeMax.push_back(rangeMax[rangeI]);
+        }
+    }
+}
+
+
+bool PdbMlSchema::_HasMultipleSubRanges(const string& itemName)
+{
+  const vector<string>& rangeMin = _dataInfo.GetItemAttribute(itemName,
+    CifString::CIF_DDL_CATEGORY_ITEM_RANGE,
+    CifString::CIF_DDL_ITEM_MINIMUM);
+
+  const vector<string>& rangeMax = _dataInfo.GetItemAttribute(itemName,
+    CifString::CIF_DDL_CATEGORY_ITEM_RANGE,
+    CifString::CIF_DDL_ITEM_MAXIMUM);
+
+    vector<string> incRangeMin;
+    vector<string> incRangeMax;
+
+    _AggregateInclusiveRanges(rangeMin, rangeMax, incRangeMin, incRangeMax);
+
+    return ((incRangeMin.size() != 0) && (incRangeMin.size() != 1));
 }
 
