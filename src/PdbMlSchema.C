@@ -666,6 +666,25 @@ void PdbMlSchema::_WriteCategoryKeysAndKeyrefs(const string& catName)
             keyId++;
         }
 
+        for (unsigned int keyItemI = 0; keyItemI < parComboKeys[keyI].size();
+          ++keyItemI)
+        {
+            if (_HasMultipleSubRanges(parComboKeys[keyI][keyItemI]))
+            {
+                cerr << "WARNING: Detected multiple permitted value"\
+                  " ranges for item " + parComboKeys[keyI][keyItemI] + 
+                  ", which would participate in"\
+                  " key/keyref relationship as a union. Xerces"\
+                  " validator would flag all values of this item"\
+                  " as key/keyref errors, while other validators"\
+                  " would not. It is advised to remove this item from"\
+                  " parent/child relationship, if value ranges are"\
+                  " to be kept, or change value ranges to a single"\
+                  " range if parent/child relationship is to be kept."
+                  << endl;
+            }
+        }
+
         for (unsigned int childI = 0; childI < childrenKeys.size(); ++childI)
         {
             string childCatName;
@@ -716,11 +735,15 @@ void PdbMlSchema::_WriteCategoryKeysAndKeyrefs(const string& catName)
                 {
                     if (_HasMultipleSubRanges(childrenKeys[childI][childKeyI][keyItemI]))
                     {
-                        cerr << "WARNING: Detected multiple item ranges"\
-                          " for item " + childrenKeys[childI][childKeyI][keyItemI] + ", which participates in"\
+                        cerr << "WARNING: Detected multiple permitted value"\
+                          " ranges for item " + childrenKeys[childI][childKeyI][keyItemI] + ", which would participate in"\
                           " key/keyref relationship as a union. Xerces"\
-                          " validator will flag all instances of this data"\
-                          " as errors, while other validators will not."
+                          " validator would flag all values of this item"\
+                          " as key/keyref errors, while other validators"\
+                          " would not. It is advised to remove this item from"\
+                          " parent/child relationship, if value ranges are"\
+                          " to be kept, or change value ranges to a single"\
+                          " range if parent/child relationship is to be kept."
                           << endl;
                     }
                     string chAttribName;
