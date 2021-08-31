@@ -1256,7 +1256,7 @@ void format_cif_descriptionXML(string& obuf, const string& str)
                     olineBuf += word[word.size() - 1];
                 }
             }
-            catch (EmptyValueException)
+            catch (EmptyValueException& exc)
             {
                 olineBuf += word;
             }
