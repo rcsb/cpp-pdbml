@@ -561,6 +561,10 @@ void XmlWriter::_ConvertDataTypeXML(const eTypeCode iType)
     {
         _io << "xsd:date";
     }
+    else if (iType == eTYPE_CODE_FLOAT_SCI)
+    {
+        _io << "xsd:float";
+    }
     else
     {
         throw out_of_range("Invalid type code in "\

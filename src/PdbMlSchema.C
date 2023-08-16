@@ -1167,6 +1167,12 @@ void PdbMlSchema::_WriteDataTypeAsAttribute(const string& itemName)
 {
     eTypeCode iType = _dataInfo._GetDataType(itemName);
 
+    if (CifExcept::CanRepresentAsScientific(itemName) && iType == eTYPE_CODE_FLOAT)
+        {
+	  iType = eTYPE_CODE_FLOAT_SCI;
+        }
+
+
     _xsdWriter._WriteDataTypeAsAttribute(iType);
 }
 
