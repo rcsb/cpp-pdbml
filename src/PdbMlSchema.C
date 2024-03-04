@@ -937,6 +937,10 @@ void PdbMlSchema::_WriteDataTypeAsElement(const string& itemName)
     CifString::CIF_DDL_ITEM_CODE);
 
   eTypeCode iType = _dataInfo._GetDataType(itemName);
+  if (CifExcept::CanRepresentAsScientific(itemName) && iType == eTYPE_CODE_FLOAT)
+  {
+    iType = eTYPE_CODE_FLOAT_SCI;
+  }
 
   if (!enums.empty())
   {
